@@ -4,6 +4,42 @@
 
 **这是供研究与自行部署的源码版。最小示例不需要外部模型，不调用云端服务，不需要 API Key 或激活码。完整模型检测、PDF 解析、外部应用接入则需要额外准备，不能把最小示例的成功等同于完整系统已就绪。**
 
+## 作为本地 AI 网关使用
+
+支持自定义 API 地址的应用，可以将兼容请求先交给本机脱敏网关：本地规则、词典和 NER 共同检测，按应用策略替换敏感值，再转发到配置好的上游模型服务。原值映射留在本地；响应默认保留占位符，也可为受信任的本地应用显式启用自动回填。
+
+```mermaid
+flowchart LR
+    subgraph LOCAL["本机运行环境"]
+        APP["AI 客户端 / 自有应用<br/>自行配置网关地址"]
+        subgraph CODE["本仓库提供的网关代码"]
+            ENTRY["按应用接入<br/>绑定检测策略与词典"]
+            DETECT["规则 + 词典 + 本地 NER"]
+            MASK["融合与策略处理<br/>占位符替换 / 出站检查"]
+            MAP[("本地原值映射")]
+            RETURN["默认返回占位符<br/>或显式允许后校验回填"]
+        end
+        WEIGHTS["NER 权重：不在本仓库<br/>自行下载、核实许可、本地加载"]
+        APP -->|原始请求| ENTRY
+        ENTRY --> DETECT --> MASK
+        WEIGHTS -.->|本地加载| DETECT
+        MASK --> MAP
+        MAP -->|仅本地回填使用| RETURN
+        RETURN -->|响应| APP
+    end
+    UPSTREAM["上游大模型 API：不在本仓库<br/>自行准备服务地址、模型与凭据"]
+    MASK -->|检查通过后的脱敏请求| UPSTREAM
+    UPSTREAM -->|模型响应| RETURN
+    classDef external fill:#fff8e6,stroke:#a66b00,stroke-dasharray:5 5,color:#333;
+    class WEIGHTS,UPSTREAM external;
+```
+
+图示为准备好 NER 后的网关能力；本仓库提供加载代码，不包含权重。上游身份验证凭据仍需传给对应服务，不能把“文本脱敏”理解为所有请求字段都被隐藏。未通过必要检测或出站检查的请求会被阻断；检测覆盖本身不等于零漏检。
+
+例如，OpenAI Chat Completions 兼容客户端可将 Base URL 设为 `http://127.0.0.1:8765/apps/gateway_demo/v1`。该地址需先注册应用、配置上游并准备本地检测器；当前不是通用协议转换器，也不自动代理应用的其他网络请求。
+
+详细配置、两种响应模式和接口边界见 [网关接入说明](docs/GATEWAY.md)。
+
 ## 先跑通一个不依赖模型的示例
 
 需要 Python 3.10 或更新版本。首次安装需要获取普通 Python 依赖；安装完成后，示例运行不联网。
@@ -59,6 +95,7 @@ macOS 服务映射默认使用钥匙串支持的加密，Windows 使用 DPAPI；
 ## 阅读路线与外部资源
 
 - [核心流程和代码入口](docs/ARCHITECTURE.md)
+- [作为本地 AI 网关使用：配置与请求流程](docs/GATEWAY.md)
 - [模型与第三方资源索引、准备方法](docs/EXTERNAL_RESOURCES.md)
 - [能力范围和安全边界](docs/BOUNDARIES.md)
 - [第三方许可说明](THIRD_PARTY_NOTICES.md)
