@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tuomin 本地脱敏网关 · 控制台</title>
+<style>
+  /* ============ Tuomin Console · 深色科技风设计系统 ============ */
+  :root {
+    --fg:#e7ecf5; --muted:#98a2b8; --faint:#64708a;
+    --line:rgba(148,163,184,.16); --line2:rgba(148,163,184,.09);
+    --bg:#0a0e17; --bg-2:#0d1220; --card:#101624; --card-2:#0d1320;
+    --accent:#22d3ee; --accent-2:#818cf8; --accent-soft:rgba(34,211,238,.12);
+    --ok:#34d399; --ok-soft:rgba(52,211,153,.13);
+    --danger:#fb7185; --danger-soft:rgba(251,113,133,.12);
+    --warn:#fbbf24; --warn-soft:rgba(251,191,36,.13);
+    --role:#2dd4bf; --role-soft:rgba(45,212,191,.13);
+    --ph:#a5b4cf; --ph-soft:rgba(165,180,207,.13);
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,monospace;
+    --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 16px 40px -24px rgba(0,0,0,.7);
+    --glow:0 0 24px -6px rgba(34,211,238,.45);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body {
+    font:14px/1.65 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif; color:var(--fg);
+    background:
+      radial-gradient(900px 420px at 85% -8%, rgba(34,211,238,.09) 0%, transparent 62%),
+      radial-gradient(700px 380px at -10% 12%, rgba(129,140,248,.07) 0%, transparent 58%),
+      var(--bg);
+    min-height:100vh;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:radial-gradient(rgba(148,163,184,.055) 1px, transparent 1px);
+    background-size:26px 26px;
+    mask-image:linear-gradient(180deg, rgba(0,0,0,.8), rgba(0,0,0,.25) 420px, transparent 720px);
+    -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.8), rgba(0,0,0,.25) 420px, transparent 720px);
+  }
+  ::selection { background:rgba(34,211,238,.28); }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb { background:#232c40; border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background:#2e3a56; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  /* ---- header ---- */
+  header.hero {
+    background:
+      radial-gradient(600px 300px at 88% -40%, rgba(34,211,238,.16) 0%, transparent 60%),
+      linear-gradient(160deg, #0c1424 0%, #0a1120 55%, #0c1a26 100%);
+    color:#eef2fa; padding:22px 26px 20px;
+    border-bottom:1px solid rgba(34,211,238,.18);
+    position:relative; overflow:hidden;
+  }
+  header.hero::after {
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:22px 22px;
+    mask-image:linear-gradient(120deg, transparent 55%, rgba(0,0,0,.6));
+    -webkit-mask-image:linear-gradient(120deg, transparent 55%, rgba(0,0,0,.6));
+  }
+  .hero .brand { display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
+  .hero .logo {
+    width:38px; height:38px; border-radius:11px;
+    background:linear-gradient(145deg, rgba(34,211,238,.22), rgba(129,140,248,.16));
+    display:grid; place-items:center; font-size:15px; font-weight:800; color:var(--accent);
+    box-shadow:inset 0 0 0 1px rgba(34,211,238,.35), var(--glow);
+    font-family:var(--mono); letter-spacing:.02em;
+  }
+  .hero h1 { font-size:17.5px; margin:0; font-weight:680; letter-spacing:.3px; }
+  .hero .sub { color:#93a0b8; font-size:12px; margin-top:2px; }
+  .trust { display:flex; gap:7px; flex-wrap:wrap; margin-top:14px; position:relative; z-index:1; }
+  .trust span, .trust a {
+    font-size:11.5px; color:#aeb9cf;
+    background:rgba(148,163,184,.07); border:1px solid rgba(148,163,184,.16);
+    padding:3px 10px; border-radius:20px; backdrop-filter:blur(4px);
+  }
+  .trust a { text-decoration:none; transition:.15s; }
+  .trust a:hover { color:#fff; border-color:rgba(34,211,238,.4); background:rgba(34,211,238,.09); }
+  .tokenbar { display:flex; align-items:center; gap:9px; margin-top:14px; flex-wrap:wrap; position:relative; z-index:1; }
+  .tokenbar label { color:#93a0b8; font-size:12px; }
+  .tokenbar input {
+    min-width:280px; padding:7px 11px; border-radius:9px;
+    border:1px solid rgba(148,163,184,.24);
+    background:rgba(10,14,23,.6); color:var(--fg); font:inherit;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .tokenbar input:focus { outline:none; border-color:rgba(34,211,238,.55); box-shadow:0 0 0 3px rgba(34,211,238,.14); }
+  .tokenbar input::placeholder { color:#5d6a84; }
+  .tokenbar .meta { color:#7d89a3; font-size:11.5px; }
+  /* ---- tabs ---- */
+  nav.tabs {
+    display:flex; gap:3px; padding:6px; margin:18px auto 0; max-width:1080px; width:calc(100% - 36px);
+    background:rgba(16,22,36,.88); border:1px solid var(--line); border-radius:14px;
+    box-shadow:var(--shadow); backdrop-filter:blur(14px);
+    position:sticky; top:12px; z-index:6;
+  }
+  nav.tabs button {
+    flex:1; background:none; border:none; border-radius:10px; color:var(--muted);
+    padding:9px 10px; cursor:pointer; font:inherit; font-weight:550; transition:.15s; white-space:nowrap;
+  }
+  nav.tabs button:hover { background:rgba(148,163,184,.08); color:var(--fg); }
+  nav.tabs button.active {
+    background:linear-gradient(180deg, rgba(34,211,238,.16), rgba(34,211,238,.09));
+    color:var(--accent);
+    box-shadow:inset 0 0 0 1px rgba(34,211,238,.32), 0 0 18px -8px rgba(34,211,238,.5);
+  }
+  main { max-width:1080px; margin:18px auto 48px; padding:0 18px; position:relative; z-index:1; }
+  section.tab { display:none; animation:fade .25s ease; }
+  section.tab.active { display:block; }
+  @keyframes fade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { section.tab { animation:none; } * { transition:none !important; } }
+  /* ---- cards ---- */
+  .card {
+    background:linear-gradient(180deg, var(--card), var(--card-2));
+    border:1px solid var(--line); border-radius:15px; padding:19px 21px; margin-bottom:16px;
+    box-shadow:var(--shadow);
+  }
+  .card h2 { font-size:14.5px; margin:0 0 4px; font-weight:680; letter-spacing:.2px; display:flex; align-items:center; gap:8px; }
+  .card h2::before { content:""; width:3px; height:14px; border-radius:2px; background:linear-gradient(180deg,var(--accent),var(--accent-2)); box-shadow:var(--glow); }
+  .card .hint { color:var(--muted); font-size:12px; margin:0 0 14px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  label { color:var(--muted); font-size:12px; }
+  code { font-family:var(--mono); font-size:12px; background:rgba(148,163,184,.1); border:1px solid var(--line2); border-radius:5px; padding:1px 5px; color:var(--accent); }
+  select, input, textarea {
+    padding:8px 11px; border:1px solid var(--line); border-radius:9px; font:inherit; color:var(--fg);
+    background:var(--bg-2); transition:border-color .15s, box-shadow .15s;
+  }
+  select:focus, input:focus, textarea:focus { outline:none; border-color:rgba(34,211,238,.55); box-shadow:0 0 0 3px rgba(34,211,238,.14); }
+  input::placeholder, textarea::placeholder { color:#5d6a84; }
+  input { min-width:150px; }
+  input[type="file"] { color:var(--muted); }
+  input[type="file"]::file-selector-button {
+    border:1px solid var(--line); border-radius:8px; background:rgba(148,163,184,.1); color:var(--fg);
+    padding:6px 12px; margin-right:10px; font:inherit; cursor:pointer; transition:.15s;
+  }
+  input[type="file"]::file-selector-button:hover { border-color:rgba(34,211,238,.4); background:rgba(34,211,238,.1); }
+  textarea { width:100%; min-height:104px; resize:vertical; line-height:1.75; }
+  .btn {
+    padding:8px 16px; border:1px solid transparent; border-radius:9px; cursor:pointer; font:inherit; font-weight:600;
+    background:linear-gradient(180deg, #26d6ef, #0eb8d4); color:#06222b; letter-spacing:.2px; transition:.15s;
+    box-shadow:0 0 0 1px rgba(34,211,238,.25), 0 8px 22px -12px rgba(34,211,238,.55);
+  }
+  .btn:hover { filter:brightness(1.08); box-shadow:0 0 0 1px rgba(34,211,238,.45), 0 10px 26px -10px rgba(34,211,238,.6); }
+  .btn:active { transform:translateY(1px); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; filter:none; box-shadow:none; }
+  .btn.ghost { background:transparent; color:var(--accent); border-color:rgba(34,211,238,.35); box-shadow:none; }
+  .btn.ghost:hover { background:var(--accent-soft); border-color:rgba(34,211,238,.55); }
+  .btn.danger { background:transparent; color:var(--danger); border-color:rgba(251,113,133,.35); padding:5px 11px; font-size:12.5px; box-shadow:none; }
+  .btn.danger:hover { background:var(--danger-soft); }
+  .btn.sm { padding:6px 12px; font-size:12.5px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line2); font-size:13px; vertical-align:middle; }
+  th { color:var(--faint); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+  tbody tr:hover { background:rgba(148,163,184,.05); }
+  .pills span { display:inline-block; background:rgba(148,163,184,.08); border:1px solid var(--line); border-radius:20px; padding:2px 10px; margin:2px 6px 2px 0; font-size:12px; }
+  .meta { color:var(--muted); font-size:12px; }
+  .empty { color:var(--faint); padding:16px 2px; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  :focus-visible { outline:2px solid rgba(34,211,238,.6); outline-offset:2px; }
+  #toast {
+    position:fixed; bottom:22px; right:22px; background:#141c2e; color:var(--fg);
+    border:1px solid rgba(34,211,238,.3); padding:11px 17px; border-radius:11px; opacity:0;
+    transform:translateY(8px); transition:.22s; box-shadow:0 20px 50px -20px rgba(0,0,0,.8), var(--glow); z-index:20;
+  }
+  #toast.show { opacity:1; transform:none; }
+  /* ---- 实时脱敏 ---- */
+  .controls { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .samples { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip-btn {
+    background:rgba(129,140,248,.1); color:#aab5ff; border:1px solid rgba(129,140,248,.28);
+    border-radius:20px; padding:5px 13px; font-size:12.5px; cursor:pointer; font:inherit; font-weight:550; transition:.15s;
+  }
+  .chip-btn:hover { background:rgba(129,140,248,.18); border-color:rgba(129,140,248,.5); }
+  .ck { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:12.5px; cursor:pointer; user-select:none; }
+  .ck input { accent-color:var(--accent); min-width:0; }
+  .panes { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:6px; }
+  @media (max-width:760px){ .panes { grid-template-columns:1fr; } }
+  .pane { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--bg-2); }
+  .pane .ph { padding:8px 13px; font-size:12px; font-weight:600; border-bottom:1px solid var(--line2); display:flex; align-items:center; gap:7px; }
+  .pane.before .ph { background:rgba(148,163,184,.05); color:var(--muted); }
+  .pane.after .ph { background:linear-gradient(90deg, rgba(34,211,238,.1), transparent 65%); color:var(--accent); }
+  .pane .body { padding:13px 15px; white-space:pre-wrap; word-break:break-word; font-size:13.5px; line-height:1.9; min-height:84px; }
+  .dot { width:7px; height:7px; border-radius:50%; display:inline-block; box-shadow:0 0 8px currentColor; }
+  /* highlight tokens */
+  mark.sens { background:var(--danger-soft); color:var(--danger); border-radius:4px; padding:0 3px; text-decoration:line-through; text-decoration-color:rgba(251,113,133,.55); }
+  .tok { border-radius:5px; padding:1px 6px; font-weight:600; font-size:12.5px; font-family:var(--mono); white-space:nowrap; }
+  .tok.role { background:var(--role-soft); color:var(--role); box-shadow:inset 0 0 0 1px rgba(45,212,191,.35); }
+  .tok.cred { background:var(--danger-soft); color:var(--danger); box-shadow:inset 0 0 0 1px rgba(251,113,133,.35); }
+  .tok.ph   { background:var(--ph-soft); color:var(--ph); box-shadow:inset 0 0 0 1px rgba(165,180,207,.28); }
+  .tok.gen  { background:var(--warn-soft); color:var(--warn); box-shadow:inset 0 0 0 1px rgba(251,191,36,.32); font-family:inherit; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; color:var(--muted); font-size:12px; }
+  .legend b { font-weight:600; }
+  /* stat cards */
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
+  @media (max-width:620px){ .stats { grid-template-columns:repeat(2,1fr); } }
+  .stat { border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:linear-gradient(180deg, rgba(148,163,184,.05), transparent); }
+  .stat .n { font-size:26px; font-weight:700; line-height:1.1; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  .stat .l { color:var(--muted); font-size:12px; margin-top:4px; }
+  .stat.accent .n { color:var(--accent); text-shadow:0 0 18px rgba(34,211,238,.5); }
+  .stat.gen .n { color:var(--warn); }
+  .stat.block .n { color:var(--danger); }
+  .stat.ph .n { color:var(--ph); }
+  .blocked-note { margin-top:12px; padding:11px 14px; border-radius:10px; background:var(--danger-soft); color:var(--danger); font-size:12.5px; border:1px solid rgba(251,113,133,.3); }
+  .kv { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .kv .k { font-size:11.5px; background:rgba(148,163,184,.07); border:1px solid var(--line); border-radius:7px; padding:3px 9px; color:var(--muted); font-family:var(--mono); }
+  .kv .k b { color:var(--fg); font-weight:600; }
+</style>
+<link rel="stylesheet" href="./tuomin-theme.css" />
+</head>
+<body class="tm-page tm-console">
+<header class="hero">
+  <div class="tm-header-row">
+    <div class="brand tm-brand-lockup">
+      <div class="logo tm-brand-mark">T</div>
+      <div>
+        <h1>Tuomin 本地脱敏网关 · 控制台</h1>
+        <div class="sub">中立中央脱敏服务 · 一套引擎，多应用接入</div>
+      </div>
+    </div>
+    <nav class="tm-global-nav" aria-label="全局导航">
+      <a class="active" href="./">控制台</a>
+      <a href="./about.html">公开版说明</a>
+    </nav>
+  </div>
+  <div class="trust">
+    <span>仅本机 127.0.0.1</span>
+    <span>词典与映射不出本机</span>
+    <span>加密映射原值永不进 UI</span>
+    <span>非零泄漏 · 数据最小化</span>
+    <span id="licenseCustomer" style="display:none"></span>
+  </div>
+  <div class="tokenbar">
+    <label>管理 Token</label>
+    <input id="adminToken" type="password" placeholder="粘贴管理令牌文件中的 Token" />
+    <button class="btn ghost sm" id="saveToken">保存</button>
+    <span id="tokenMeta" class="meta"></span>
+  </div>
+</header>
+
+<div id="licenseBanner" class="blocked-note" style="display:none;max-width:1080px;width:calc(100% - 36px);margin:18px auto 0"></div>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="try" class="active">实时脱敏</button>
+  <button data-tab="files">文件脱敏</button>
+  <button data-tab="refill">回填还原</button>
+  <button data-tab="answer">回答回填</button>
+  <button data-tab="preview">可信预览</button>
+  <button data-tab="records">记录</button>
+  <button data-tab="dict">本地词典</button>
+  <button data-tab="apps">应用 / 档位</button>
+  <button data-tab="onboard">接入向导</button>
+  <button data-tab="settings">设置</button>
+  <button data-tab="license">授权</button>
+</nav>
+
+<main>
+  <!-- ===== 试一试（showcase） ===== -->
+  <section class="tab active" id="tab-try">
+    <div class="card">
+      <h2>实时脱敏预览</h2>
+      <p class="hint">粘贴一段（合成）文本，看脱敏前后对照。预览走 <code>/redact_snippet</code>，<b>不落盘、不回填</b>。角色化与泛化需勾选「本地 NER」。</p>
+      <div class="controls">
+        <div class="samples" id="samples">
+          <button class="chip-btn" data-sample="contract">载入·合同片段</button>
+          <button class="chip-btn" data-sample="invest">载入·投前项目</button>
+          <button class="chip-btn" data-sample="general">载入·通用 PII</button>
+          <button class="chip-btn" data-sample="litigation">载入·诉讼文书</button>
+        </div>
+        <span style="flex:1"></span>
+        <label>场景 / 档位</label><select id="t_profile"></select>
+        <label class="ck"><input type="checkbox" id="t_ner" checked /> 本地 NER</label>
+        <button class="btn" id="t_run">▶ 脱敏</button>
+      </div>
+      <textarea id="t_text" placeholder="例如：本协议由甲方……与乙方……签订，合同金额人民币 850 万元，工程地点位于浙江省杭州市……"></textarea>
+
+      <div class="panes">
+        <div class="pane before">
+          <div class="ph"><span class="dot" style="background:var(--danger)"></span> 原文（红色＝敏感信息）</div>
+          <div class="body" id="t_before"><span class="empty">脱敏后这里显示原文，敏感处标红。</span></div>
+        </div>
+        <div class="pane after">
+          <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后（发往大模型的内容）</div>
+          <div class="body" id="t_after"><span class="empty">这里显示会真正发送到云端的内容。</span></div>
+        </div>
+      </div>
+      <div class="legend" id="t_legend" style="display:none"></div>
+
+      <div class="stats" id="t_stats" style="display:none">
+        <div class="stat accent"><div class="n" id="s_detect">0</div><div class="l">检出敏感项</div></div>
+        <div class="stat ph"><div class="n" id="s_ph">0</div><div class="l">占位替换</div></div>
+        <div class="stat gen"><div class="n" id="s_gen">0</div><div class="l">不可逆泛化</div></div>
+        <div class="stat block"><div class="n" id="s_block">0</div><div class="l">硬拦截标签</div></div>
+      </div>
+      <div id="t_extra"></div>
+    </div>
+  </section>
+
+  <!-- ===== 文件脱敏（workbench） ===== -->
+  <section class="tab" id="tab-files">
+    <div class="card">
+      <h2>文件脱敏</h2>
+      <p class="hint">导入文件（txt / md / csv / json / yaml / docx / doc / xlsx / xlsm / xls），解析为 Markdown 后全量可逆脱敏。原文件不会被修改；产物只生成新文件。</p>
+      <div class="row" style="margin-bottom:10px">
+        <label>绑定应用（生产词典）</label>
+        <select id="f_app"><option value="">不绑定（仅本地预览，禁止出站）</option></select>
+        <span id="f_app_notice" class="hint" role="status"></span>
+      </div>
+      <div class="row">
+        <input type="file" id="f_file" accept=".txt,.md,.csv,.json,.yaml,.yml,.docx,.doc,.xlsx,.xlsm,.xls" />
+        <button class="btn" id="f_run">▶ 解析并脱敏</button>
+        <button class="btn ghost" id="f_run_docx" style="display:none">▶ 原格式脱敏（DOCX）</button>
+      </div>
+      <div id="f_egress"></div>
+      <div id="f_meta"></div>
+      <div id="f_warn"></div>
+      <div class="pane after" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后的 Markdown</div>
+        <div class="body" id="f_out"><span class="empty">这里显示脱敏后的 Markdown 文本。</span></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost sm" id="f_dl_md" disabled>下载脱敏 MD</button>
+        <button class="btn ghost sm" id="f_dl_manifest" disabled>下载占位符清单</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>导出恢复包（.tuominmap）</h2>
+      <p class="hint">恢复包含原值（口令加密），等同于敏感数据，请妥善保管。回填时必须使用与任务匹配的恢复包。</p>
+      <div class="row">
+        <input id="f_pass" type="password" placeholder="恢复包口令（不保存）" />
+        <button class="btn sm" id="f_pkg" disabled>导出恢复包</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 回填还原 ===== -->
+  <section class="tab" id="tab-refill">
+    <div class="card">
+      <h2>回填还原</h2>
+      <p class="hint">上传脱敏后的 Markdown 与对应的恢复包（.tuominmap）。未编辑的文件走严格校验；编辑过的文件会先列出占位符差异，确认后才回填。</p>
+      <div class="row">
+        <label>脱敏 MD</label><input type="file" id="r_md" accept=".md,.txt" />
+        <label>恢复包</label><input type="file" id="r_pkg" accept=".tuominmap,.json" />
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>或脱敏 DOCX</label><input type="file" id="r_docx" accept=".docx" />
+        <button class="btn sm" id="r_docx_run">▶ 原格式回填 DOCX</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="r_pass" type="password" placeholder="恢复包口令" />
+        <button class="btn" id="r_run">▶ 校验并回填</button>
+      </div>
+      <div id="r_diff"></div>
+      <div class="row" id="r_confirm_row" style="display:none;margin-top:10px">
+        <label class="ck"><input type="checkbox" id="r_confirm" /> 我已核对上述占位符差异，确认回填</label>
+        <button class="btn sm" id="r_confirm_btn">确认回填</button>
+      </div>
+      <div class="pane before" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--ok)"></span> 还原后的 Markdown</div>
+        <div class="body" id="r_out"><span class="empty">这里显示还原后的文本。</span></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost sm" id="r_dl" disabled>下载还原 MD</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== AI 回答回填 ===== -->
+  <section class="tab" id="tab-answer">
+    <div class="card">
+      <h2>AI 回答回填</h2>
+      <p class="hint">把在线 AI 返回的带占位符回答粘贴或导入，选择对应恢复包并输入口令后在本机回填。AI 只引用部分占位符、重复引用均属正常；未知或损坏的占位符会被阻断。结果不会自动发回在线 AI，也不会覆盖导入文件。</p>
+      <div class="row">
+        <label>导入 TXT/MD（可选）</label><input type="file" id="an_file" accept=".md,.txt" />
+      </div>
+      <div class="row" style="margin-top:10px">
+        <textarea id="an_text" rows="8" style="width:100%" placeholder="粘贴 AI 的回答（含 &lt;ORG_001&gt; 等占位符）…"></textarea>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>恢复包</label><input type="file" id="an_pkg" accept=".tuominmap,.json" />
+        <input id="an_pass" type="password" placeholder="恢复包口令（不保存）" />
+        <button class="btn" id="an_run">▶ 本地回填</button>
+      </div>
+      <div id="an_diff"></div>
+      <div class="row" id="an_confirm_row" style="display:none;margin-top:10px">
+        <label class="ck"><input type="checkbox" id="an_confirm" /> 回答未引用任何占位符，确认按原文返回</label>
+        <button class="btn sm" id="an_confirm_btn">确认</button>
+      </div>
+      <div class="pane before" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--ok)"></span> 回填后的回答</div>
+        <div class="body" id="an_out"><span class="empty">这里显示回填后的回答。</span></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost sm" id="an_dl" disabled>下载回填结果 MD</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 可信预览 ===== -->
+  <section class="tab" id="tab-preview">
+    <div class="card">
+      <h2>可信预览</h2>
+      <p class="hint">四个面板对照：原文只在本机读取（不上传服务器）；占位符高亮并统计标签。所有内容不缓存、不写 localStorage。</p>
+      <div class="row">
+        <label>原文件（仅本机读取）</label><input type="file" id="pv_orig" />
+        <label>脱敏 MD</label><input type="file" id="pv_red" accept=".md,.txt" />
+        <label>AI 回答</label><input type="file" id="pv_ans" accept=".md,.txt" />
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>或直接粘贴 AI 回答</label>
+        <textarea id="pv_ans_text" rows="4" style="width:100%" placeholder="粘贴 AI 原回答…"></textarea>
+      </div>
+      <div class="pane before" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--warn)"></span> 原文（本机）</div>
+        <div class="body" id="pv_orig_out"><span class="empty">选择原文件后显示。</span></div>
+        <div class="kv" id="pv_orig_counts"></div>
+      </div>
+      <div class="pane after" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏结果</div>
+        <div class="body" id="pv_red_out"><span class="empty">导入脱敏 MD 后显示。</span></div>
+        <div class="kv" id="pv_red_counts"></div>
+      </div>
+      <div class="pane after" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--accent-2)"></span> AI 原回答</div>
+        <div class="body" id="pv_ans_out"><span class="empty">导入或粘贴后显示。</span></div>
+        <div class="kv" id="pv_ans_counts"></div>
+      </div>
+      <div class="pane before" style="margin-top:12px">
+        <div class="ph"><span class="dot" style="background:var(--ok)"></span> 回填结果</div>
+        <div class="body" id="pv_ref_out"><span class="empty">在下方解锁区选择恢复包并回填后显示。</span></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label>恢复包</label><input type="file" id="pv_pkg" accept=".tuominmap,.json" />
+        <input id="pv_pass" type="password" placeholder="恢复包口令（不保存）" />
+        <button class="btn sm" id="pv_refill">▶ 回填 AI 回答</button>
+        <button class="btn ghost sm" id="pv_ref_dl" disabled>下载回填结果</button>
+      </div>
+      <div id="pv_msg"></div>
+    </div>
+    <div class="card" style="background:rgba(251,113,133,.07);border-color:rgba(251,113,133,.35)">
+      <h2>原值视图（占位符 ↔ 原值）</h2>
+      <p class="hint"><b>敏感区域</b>：此处显示真实原值，请勿截图、复制或转发。离开本页、切换标签或 90 秒无操作将自动锁定；不写任何缓存与日志。</p>
+      <div class="row">
+        <button class="btn sm" id="pv_unlock">🔓 口令解锁原值视图</button>
+        <button class="btn ghost sm" id="pv_lock" disabled>立即锁定</button>
+        <span class="hint" id="pv_lock_state"></span>
+      </div>
+      <div id="pv_map"></div>
+    </div>
+  </section>
+
+  <!-- ===== 记录 ===== -->
+  <section class="tab" id="tab-records">
+    <div class="card">
+      <h2>文件任务记录</h2>
+      <p class="hint">只存文件名、哈希、计数和版本——不存正文与原值。删除任务会同步删除其映射授权，不可恢复。</p>
+      <div class="row"><button class="btn ghost sm" id="rec_refresh">刷新</button></div>
+      <div id="recJobs"><div class="empty">加载中…</div></div>
+    </div>
+    <div class="card">
+      <h2>调用账本</h2>
+      <p class="hint">各入口（workbench / api / proxy / cli）的调用记录：耗时、字符数、标签计数、是否阻断。</p>
+      <div id="recCalls"><div class="empty">加载中…</div></div>
+    </div>
+  </section>
+
+  <!-- ===== 词典 ===== -->
+  <section class="tab" id="tab-dict">
+    <div class="card">
+      <div class="row">
+        <label>选择应用</label>
+        <select id="dictApp"></select>
+        <button class="btn ghost sm" id="reloadBtn">重载词典缓存</button>
+        <span id="dictAppMeta" class="meta"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>本地词典词条</h2>
+      <p class="hint">词条是你自管的参考数据；加密映射里的原值永不出现在此界面。</p>
+      <div class="row" style="margin-bottom:10px">
+        <input id="f_canonical" placeholder="规范值（必填，如 示例建设集团）" />
+        <input id="f_label" placeholder="标签（必填，如 ORG/PERSON）" style="min-width:130px" />
+        <input id="f_aliases" placeholder="别名，逗号分隔（可选）" />
+        <select id="f_risk"><option>high</option><option>medium</option><option>low</option><option>critical</option></select>
+        <button class="btn sm" id="addBtn">添加词条</button>
+      </div>
+      <div id="dictArea"><div class="empty">请选择一个配置了词典的应用。</div></div>
+    </div>
+  </section>
+
+  <!-- ===== 应用 ===== -->
+  <section class="tab" id="tab-apps">
+    <div class="card">
+      <h2>注册新应用 / 更新</h2>
+      <p class="hint">写回 <code>tuomin_apps.json</code>（保留其它键）。已存在的 app_id 会被更新。</p>
+      <div class="row">
+        <input id="a_id" placeholder="app_id（如 my_app）" />
+        <label>敏感级</label>
+        <select id="a_sens"></select>
+        <input id="a_dict" placeholder="词典文件绝对路径（可选）" style="min-width:280px" />
+        <button class="btn sm" id="a_save">保存</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>已注册应用</h2>
+      <div id="appsArea"><div class="empty">加载中…</div></div>
+    </div>
+  </section>
+
+  <!-- ===== WorkBuddy 接入向导 ===== -->
+  <section class="tab" id="tab-onboard">
+    <div class="card">
+      <h2>WorkBuddy 接入向导</h2>
+      <p class="hint">把本机 Tuomin 网关接成 WorkBuddy 的自定义模型：自动定位网关端口 → 生成三条条目 → 写入 <code>~/.workbuddy/models.json</code>（自动备份、旧端口自愈、实测热加载生效）。上游 API key 由你提供，只写入 WorkBuddy 本地配置，<b>不落 Tuomin、不进日志</b>。</p>
+      <div class="row">
+        <label>项目 app</label>
+        <select id="w_app"></select>
+        <button class="btn ghost sm" id="w_status">检查网关</button>
+        <span id="w_gateway" class="meta"></span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>上游 API key</label>
+        <input id="w_key" type="password" placeholder="sk-… （只写入 WorkBuddy 本地 models.json）" style="min-width:340px" />
+        <button class="btn" id="w_apply">生成并写入 WorkBuddy</button>
+        <button class="btn ghost" id="w_verify">校验</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span id="w_msg" class="meta"></span>
+      </div>
+      <div id="w_result" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>还没有项目 app？一键创建</h2>
+      <p class="hint">按 WorkBuddy 需要的档位创建：<code>strict</code> + <code>refill_strict:false</code> + <code>allow_auto_refill:true</code>，并钉住上游模型（客户端无法偷换模型）。</p>
+      <div class="row">
+        <input id="w_new" placeholder="app_id（如 my_project）" />
+        <input id="w_upstream_model" placeholder="上游模型，默认 deepseek-v4-flash" />
+        <input id="w_upstream_url" placeholder="上游地址（可选）" style="min-width:320px" />
+        <button class="btn sm" id="w_create">创建</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>在 WorkBuddy 里怎么用</h2>
+      <ol class="hint" style="line-height:1.9">
+        <li>写入成功后 WorkBuddy 会自动重载 <code>models.json</code>（本机实测热加载，通常无需重启）。</li>
+        <li>打开任意会话，在模型下拉里选 <b>「&lt;app&gt;·脱敏·无感回填」</b>（日常使用）；要看脱敏证据选「思维链mask」；自检用「全mask」。</li>
+        <li>只有走该自定义模型的会话经过 Tuomin；WorkBuddy 内置模型不走网关。</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===== 设置 ===== -->
+  <section class="tab" id="tab-settings">
+    <div class="card">
+      <h2>运行时设置（只读）</h2>
+      <div id="settings" class="meta">加载中…</div>
+      <div class="kv" id="settingsKv"></div>
+      <div class="meta" style="margin-top:12px">更多：<a href="/docs" target="_blank">/docs API 文档</a> · <a href="/healthz" target="_blank">/healthz</a></div>
+    </div>
+  </section>
+
+  <!-- ===== 授权（离线授权码） ===== -->
+  <section class="tab" id="tab-license">
+    <div class="card">
+      <h2>授权状态</h2>
+      <p class="hint">离线授权仅用于控制新建任务；已有数据的回填与导出不受授权到期影响。</p>
+      <div id="licenseStatus" class="meta">加载中…</div>
+      <div id="licenseKv" class="kv"></div>
+    </div>
+    <div class="card">
+      <h2>激活授权</h2>
+      <p class="hint">授权码在本机校验并保存。重新激活可用于续期或更换授权。</p>
+      <textarea id="licenseCode" placeholder="粘贴从发行方获取的授权码（TM1. 开头）"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="licenseActivate">激活</button>
+        <span id="licenseError" class="meta" style="color:var(--danger)"></span>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+let SETTINGS = null;
+
+const ROLE_PREFIXES = new Set(["PARTYA","PARTYB","GENCON","SUBCON","GUARANTOR","SUPERVISOR","PRINCIPAL",
+  "LEAD","TARGET","PARTNER","INVESTOR","TRANSFEROR","TRANSFEREE"]);
+
+const SAMPLES = {
+  contract: { ner:true, profile:"contract",
+    text:"本协议由甲方北京华创建设集团有限公司与乙方上海远大工程咨询有限公司于2026年3月15日签订。担保人为深圳安信融资担保有限公司，联系人王海洋，电话13900001111。合同金额为人民币8,500,000.00元，工程地点位于浙江省杭州市西湖区文三路100号。" },
+  invest: { ner:true, profile:"pre_investment",
+    text:"本次拟由牵头方红杉中国与合作方高瓴资本共同设立专项基金，受让方为目标方星海半导体科技有限公司，标的为其持有的晶圆制造业务。交易对价约人民币32亿元，预计2026年9月完成交割，项目地点位于上海市浦东新区张江高科技园区。" },
+  general: { ner:true, profile:"strict",
+    text:"客户李文博（身份证号110105199003078888），手机18800002222，邮箱li@example.test，公司账户 6222 0212 3456 7890 123，部署密钥 api_key = a8Xk2Lm9Qz7Yw3Rv5Tp1Bn。" },
+  litigation: { ner:true, app:"litigation",
+    text:"上诉人示例建设集团有限公司与被上诉人示范地产开发有限公司建设工程施工合同纠纷一案，不服一审判决上诉，由北京市高级人民法院二审审理。涉案工程款人民币8,500,000.00元，约定2025年12月30日前支付，被上诉人逾期未付；二审依据民法典及建工司法解释审查工程款及违约金。工程地址浙江省杭州市西湖区文三路100号。" },
+};
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1900); }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c])); }
+function getToken() { return localStorage.getItem("tuomin_admin_token") || ""; }
+async function api(method, path, body) {
+  const opt = { method, headers: { "X-Requested-With": "tuomin-ui", "x-tuomin-admin-token": getToken() } };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+  if (!r.ok) throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
+  return data;
+}
+
+// --- admin token ---
+function refreshTokenMeta() { $("#tokenMeta").textContent = getToken() ? "✓ 已设置（存于本机浏览器）" : "未设置 · 管理操作将被拒绝"; }
+$("#saveToken").onclick = () => {
+  localStorage.setItem("tuomin_admin_token", $("#adminToken").value.trim());
+  $("#adminToken").value = ""; refreshTokenMeta(); toast("Token 已保存"); refreshAll();
+};
+
+// --- tabs ---
+$$("#tabs button").forEach((b) => b.onclick = () => {
+  $$("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
+  $$("section.tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + b.dataset.tab));
+});
+
+// --- settings ---
+async function loadSettings() {
+  SETTINGS = await api("GET", "/admin/settings");
+  const joinEsc = (arr) => (arr || []).map(esc).join("、");
+  const mapping = SETTINGS.mapping_store || {};
+  const mappingLabel = mapping.encrypted_at_rest
+    ? `${esc(mapping.format_marker || "encrypted")} 已加密`
+    : `${esc(mapping.format_marker || "unknown")} 开发模式`;
+  $("#settings").innerHTML =
+    `版本 <b>${esc(SETTINGS.version)}</b> · 映射TTL ${esc(SETTINGS.mapping_ttl_seconds)}s · 会话TTL ${esc(SETTINGS.session_ttl_seconds)}s · ` +
+    `映射存储 ${mappingLabel} · 本地NER ${SETTINGS.ner_available ? "已装" : "未装"}`;
+  $("#settingsKv").innerHTML =
+    `<span class="k">场景 <b>${joinEsc(SETTINGS.scenarios) || "—"}</b></span>` +
+    `<span class="k">档位 <b>${joinEsc(SETTINGS.profiles)}</b></span>` +
+    `<span class="k">敏感级 <b>${joinEsc(SETTINGS.sensitivities)}</b></span>` +
+    `<span class="k">已注册 app <b>${joinEsc(SETTINGS.apps) || "（无）"}</b></span>`;
+  fill($("#a_sens"), SETTINGS.sensitivities);
+  buildProfileSelect();
+}
+function buildProfileSelect() {
+  const sel = $("#t_profile");
+  const grp = (label, items) => items && items.length
+    ? `<optgroup label="${label}">${items.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}</optgroup>` : "";
+  sel.innerHTML = `<option value="">（用应用默认 / strict）</option>` +
+    grp("场景", SETTINGS.scenarios) + grp("档位", SETTINGS.profiles) + grp("敏感级", SETTINGS.sensitivities);
+}
+function fill(sel, values) {
+  sel.innerHTML = ""; for (const v of values) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
+}
+function fillApps(sel, apps) { sel.innerHTML = ""; for (const a of apps) { const o = document.createElement("option"); o.value = a.app_id; o.textContent = a.app_id + (a.has_dictionary ? "" : "（无词典）"); sel.appendChild(o); } }
+
+// --- dictionary tab ---
+// 文件脱敏的默认绑定应用：存在时自动选中（仍可切回「不绑定」本地预览）。
+const DEFAULT_BIND_APP = "production";
+let fileAppInitialized = false;
+$("#f_app").addEventListener("change", () => { fileAppInitialized = true; });
+async function loadAppsIntoSelectors() {
+  const { apps } = await api("GET", "/admin/apps");
+  fillApps($("#dictApp"), apps);
+  const fApp = $("#f_app");
+  const prev = fApp.value;
+  fillApps(fApp, apps);
+  fApp.prepend(new Option("不绑定（仅本地预览，禁止出站）", ""));
+  const available = new Set(apps.map((a) => a.app_id));
+  const removed = fileAppInitialized && prev && !available.has(prev);
+  fApp.value = fileAppInitialized
+    ? (available.has(prev) ? prev : "")
+    : (available.has(DEFAULT_BIND_APP) ? DEFAULT_BIND_APP : "");
+  fileAppInitialized = true;
+  $("#f_app_notice").textContent = removed ? "原绑定应用已不存在，已切换为仅本地预览。" : "";
+  renderAppsTable(apps);
+  wbFillApps(apps);
+  if (apps.length) { $("#dictApp").value = apps[0].app_id; await loadDict(); }
+  else { $("#dictArea").innerHTML = "<div class='empty'>未注册应用，去『应用 / 档位』标签添加。</div>"; }
+}
+$("#dictApp").onchange = loadDict;
+async function loadDict() {
+  const appId = $("#dictApp").value; if (!appId) return;
+  try {
+    const { entry } = await api("GET", "/admin/apps/" + encodeURIComponent(appId));
+    const prof = entry.profile ? (typeof entry.profile === "string" ? entry.profile : "(inline)") : (entry.sensitivity || "strict");
+    $("#dictAppMeta").textContent = `档位/敏感级: ${prof}` + (entry.dictionary ? ` · 词典: ${entry.dictionary}` : " · 未配置词典");
+    const { entries } = await api("GET", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary");
+    if (!entries.length) { $("#dictArea").innerHTML = "<div class='empty'>暂无词条。用上方表单添加。</div>"; return; }
+    let h = "<table><thead><tr><th>规范值</th><th>标签</th><th>别名</th><th>风险</th><th></th></tr></thead><tbody>";
+    for (const e of entries) {
+      const al = (e.aliases || []).map((a) => `<span>${esc(a)}</span>`).join("") || '<span class="meta">—</span>';
+      h += `<tr><td><b>${esc(e.canonical_value)}</b></td><td>${esc(e.label)}</td><td class="pills">${al}</td><td>${esc(e.risk_level||"")}</td><td><button class="btn danger" data-del="${esc(e.entry_id)}">删除</button></td></tr>`;
+    }
+    $("#dictArea").innerHTML = h + "</tbody></table>";
+    $$("#dictArea [data-del]").forEach((b) => b.onclick = () => delEntry(b.dataset.del));
+  } catch (e) { $("#dictArea").innerHTML = "<div class='empty'>" + esc(e.message) + "</div>"; }
+}
+async function addEntry() {
+  const appId = $("#dictApp").value; if (!appId) return toast("请先选应用");
+  const canonical = $("#f_canonical").value.trim(), label = $("#f_label").value.trim();
+  if (!canonical || !label) return toast("规范值和标签必填");
+  const aliases = $("#f_aliases").value.split(",").map((s) => s.trim()).filter(Boolean);
+  try {
+    await api("POST", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary", { canonical_value: canonical, label, aliases, risk_level: $("#f_risk").value });
+    $("#f_canonical").value = $("#f_label").value = $("#f_aliases").value = ""; toast("已添加"); loadDict();
+  } catch (e) { toast("失败：" + e.message); }
+}
+async function delEntry(id) {
+  if (!confirm("删除该词条？")) return;
+  try { await api("DELETE", "/admin/apps/" + encodeURIComponent($("#dictApp").value) + "/dictionary/" + encodeURIComponent(id)); toast("已删除"); loadDict(); }
+  catch (e) { toast("失败：" + e.message); }
+}
+$("#addBtn").onclick = addEntry;
+$("#reloadBtn").onclick = async () => { try { await api("POST", "/dict/reload"); toast("词典缓存已重载"); } catch (e) { toast(e.message); } };
+
+// --- apps tab ---
+function renderAppsTable(apps) {
+  if (!apps.length) { $("#appsArea").innerHTML = "<div class='empty'>暂无应用。</div>"; return; }
+  let h = "<table><thead><tr><th>app_id</th><th>档位/敏感级</th><th>词典</th><th></th></tr></thead><tbody>";
+  for (const a of apps) {
+    const prof = a.profile ? (typeof a.profile === "string" ? a.profile : "(inline)") : (a.sensitivity || "strict");
+    h += `<tr><td><b>${esc(a.app_id)}</b></td><td>${esc(prof)}</td><td>${a.has_dictionary ? "✓" : "—"}</td><td><button class="btn danger" data-delapp="${esc(a.app_id)}">删除</button></td></tr>`;
+  }
+  $("#appsArea").innerHTML = h + "</tbody></table>";
+  $$("#appsArea [data-delapp]").forEach((b) => b.onclick = () => delApp(b.dataset.delapp));
+}
+async function saveApp() {
+  const id = $("#a_id").value.trim(); if (!id) return toast("app_id 必填");
+  const entry = { sensitivity: $("#a_sens").value };
+  const dict = $("#a_dict").value.trim(); if (dict) entry.dictionary = dict;
+  try { await api("PUT", "/admin/apps/" + encodeURIComponent(id), entry); $("#a_id").value = $("#a_dict").value = ""; toast("已保存"); refreshAll(); }
+  catch (e) { toast("失败：" + e.message); }
+}
+async function delApp(id) {
+  if (!confirm("删除应用 " + id + "？（不会删除其词典文件）")) return;
+  try { await api("DELETE", "/admin/apps/" + encodeURIComponent(id)); toast("已删除"); refreshAll(); }
+  catch (e) { toast("失败：" + e.message); }
+}
+$("#a_save").onclick = saveApp;
+
+// --- WorkBuddy 接入向导 ---
+function wbFillApps(apps) {
+  const sel = $("#w_app"); if (!sel) return;
+  const prev = sel.value, ids = apps.map((a) => a.app_id);
+  sel.innerHTML = "";
+  for (const id of ids) sel.appendChild(new Option(id, id));
+  if (ids.includes(prev)) sel.value = prev;
+}
+function wbMsg(msg, isErr) { const el = $("#w_msg"); el.textContent = msg || ""; el.style.color = isErr ? "var(--danger)" : ""; }
+function wbRenderResult(plan) {
+  const box = $("#w_result");
+  let h = "";
+  if (plan.planned_entries && plan.planned_entries.length) {
+    h += "<div class='meta'>将写入 / 自愈这些条目：</div><table><thead><tr><th>条目</th><th>URL</th></tr></thead><tbody>";
+    for (const e of plan.planned_entries) h += `<tr><td><b>${esc(e.name)}</b></td><td class="meta">${esc(e.url)}</td></tr>`;
+    h += "</tbody></table>";
+  }
+  if ((plan.gateways || []).length) {
+    h += "<div class='meta' style='margin-top:8px'>本机在线网关：" +
+      plan.gateways.map((g) => `${esc(g.base_url)} [${(g.apps || []).join(", ") || (g.apps_known ? "无" : "?")}]`).join(" · ") + "</div>";
+  }
+  box.innerHTML = h;
+}
+async function wbPlan() {
+  const app = $("#w_app").value;
+  if (!app) { $("#w_gateway").textContent = ""; wbMsg("还没有项目 app，用下面「一键创建」。", true); wbRenderResult({}); return; }
+  wbMsg("探测中…");
+  try {
+    const data = await api("GET", "/admin/integrations/workbuddy?app_id=" + encodeURIComponent(app));
+    const plan = data.plan || {};
+    $("#w_gateway").innerHTML = plan.gateway_url
+      ? `网关：<b>${esc(plan.gateway_url)}</b>${plan.verified ? " ✓ 已确认挂载该 app" : " ⚠ 未确认（" + esc(plan.reason) + "）"}`
+      : "<span style='color:var(--danger)'>未找到挂载该 app 的在线网关</span>";
+    wbRenderResult(plan);
+    wbMsg(plan.gateway_url ? "" : "请先启动带该 app 的 Tuomin 网关。", !plan.gateway_url);
+  } catch (e) { wbMsg("失败：" + e.message, true); }
+}
+async function wbCreate() {
+  const app_id = $("#w_new").value.trim();
+  if (!app_id) return toast("请填 app_id");
+  try {
+    const payload = { app_id };
+    const m = $("#w_upstream_model").value.trim(); if (m) payload.upstream_model = m;
+    const u = $("#w_upstream_url").value.trim(); if (u) payload.upstream_url = u;
+    const r = await api("POST", "/admin/integrations/workbuddy/app", payload);
+    toast(r.created ? "已创建项目 app" : "app 已存在，已沿用");
+    $("#w_new").value = "";
+    await refreshAll();
+    $("#w_app").value = app_id; wbPlan();
+  } catch (e) { toast("失败：" + e.message); }
+}
+async function wbApply() {
+  const app = $("#w_app").value;
+  const key = $("#w_key").value.trim();
+  if (!app) return toast("请先选项目 app");
+  if (!key) return toast("请填写上游 API key");
+  wbMsg("写入中…");
+  try {
+    const r = await api("POST", "/admin/integrations/workbuddy/apply", { app_id: app, api_key: key });
+    $("#w_key").value = "";   // never keep the key in the DOM
+    wbMsg("已写入 ✓");
+    $("#w_gateway").innerHTML = `网关：<b>${esc(r.gateway_url)}</b>`;
+    $("#w_result").innerHTML =
+      `<div class='meta'>写入 <b>${r.written_entries}</b> 条，自愈旧端口 <b>${r.retargeted_entries}</b> 条，共 ${r.models_total} 条；文件：<code>${esc(r.models_file)}</code>` +
+      (r.backup ? `<br>备份：<code>${esc(r.backup)}</code>` : "") +
+      `<br>去 WorkBuddy 模型下拉选：<b>${r.model_names.map(esc).join("</b> / <b>")}</b></div>`;
+  } catch (e) { wbMsg("失败：" + e.message, true); }
+}
+async function wbVerify() {
+  const app = $("#w_app").value;
+  if (!app) return toast("请先选项目 app");
+  try {
+    const r = await api("POST", "/admin/integrations/workbuddy/verify", { app_id: app });
+    let h = `<div class='meta'>校验：<b>${r.ok ? "通过 ✓" : "未通过"}</b> · 网关 ${esc(r.gateway_url || "无")} · app 已挂载 ${r.gateway_serves_app ? "✓" : "✗"}</div>`;
+    if ((r.entries || []).length) {
+      h += "<table><thead><tr><th>模式</th><th>条目</th><th>指向网关</th></tr></thead><tbody>";
+      for (const e of r.entries) h += `<tr><td>${esc(e.mode)}</td><td>${esc(e.id || "")}</td><td>${e.points_at_gateway ? "✓" : "✗"}</td></tr>`;
+      h += "</tbody></table>";
+    }
+    h += `<div class='meta' style='margin-top:6px'>${esc(r.note || "")}</div>`;
+    $("#w_result").innerHTML = h;
+    wbMsg(r.ok ? "校验通过" : "存在未指向当前网关的旧条目，重新点『生成并写入』即可自愈。", !r.ok);
+  } catch (e) { wbMsg("失败：" + e.message, true); }
+}
+$("#w_status").onclick = wbPlan;
+$("#w_app").onchange = wbPlan;
+$("#w_create").onclick = wbCreate;
+$("#w_apply").onclick = wbApply;
+$("#w_verify").onclick = wbVerify;
+$$("#tabs button").forEach((b) => b.addEventListener("click", () => { if (b.dataset.tab === "onboard") wbPlan(); }));
+
+// --- 试一试: samples ---
+let SAMPLE_APP = null;  // 当样例走"应用"(带词典)时记其 app_id；手动选档位即清空
+$$("#samples .chip-btn").forEach((b) => b.onclick = () => {
+  const s = SAMPLES[b.dataset.sample]; if (!s) return;
+  $("#t_text").value = s.text;
+  $("#t_ner").checked = s.ner;
+  SAMPLE_APP = s.app || null;
+  if (s.app) { $("#t_profile").value = ""; }  // 走应用：用应用声明的场景 + 词典(法院/法条保护需词典)
+  else if (s.profile) { const opt = [...$("#t_profile").options].find((o) => o.value === s.profile); if (opt) $("#t_profile").value = s.profile; }
+  runRedact();
+});
+$("#t_profile").addEventListener("change", () => { SAMPLE_APP = null; });  // 手动选档位 → 取消应用绑定
+
+// --- token-aware diff. Placeholders (incl. multi-underscore labels like
+// BANK_ACCOUNT / ID_CARD) are ATOMIC tokens, so a synthetic placeholder is never
+// char-aligned against the original secret — which would fragment the badge and
+// leak stray letters (e.g. the "R" of CREDENTIAL matching the key). ---
+const PH_RE = () => /<[A-Z]+(?:_[A-Z]+)*_\d+>/g;
+const PH_ONE = /^<([A-Z]+(?:_[A-Z]+)*)_\d+>$/;
+let USED = new Set();
+
+function tokenize(s, withPlaceholders) {
+  if (!withPlaceholders) return Array.from(s);  // original side: pure chars
+  const toks = [], re = PH_RE(); let last = 0, m;
+  while ((m = re.exec(s))) {
+    for (const ch of s.slice(last, m.index)) toks.push(ch);
+    toks.push(m[0]); last = re.lastIndex;        // whole placeholder = one token
+  }
+  for (const ch of s.slice(last)) toks.push(ch);
+  return toks;
+}
+function diffOps(a, b) {
+  const n = a.length, m = b.length;
+  if (n * m > 900000) return null; // perf guard for very long text
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = []; let i = 0, j = 0;
+  const push = (t, c) => { if (ops.length && ops[ops.length - 1][0] === t) ops[ops.length - 1][1] += c; else ops.push([t, c]); };
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { push("eq", a[i]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { push("del", a[i]); i++; }
+    else { push("ins", b[j]); j++; }
+  }
+  while (i < n) { push("del", a[i]); i++; }
+  while (j < m) { push("ins", b[j]); j++; }
+  return ops;
+}
+function classifyPlaceholder(token) {
+  const m = token.match(PH_ONE); if (!m) return null;
+  const pfx = m[1];
+  return pfx === "CREDENTIAL" ? "cred" : (ROLE_PREFIXES.has(pfx) ? "role" : "ph");
+}
+// an inserted segment may concatenate plain (generalized) text + atomic placeholders
+function renderInsert(seg) {
+  const re = PH_RE(); let out = "", last = 0, mt;
+  const gen = (txt) => { if (!txt) return; if (txt.trim()) { USED.add("gen"); out += `<span class="tok gen">${esc(txt)}</span>`; } else out += esc(txt); };
+  while ((mt = re.exec(seg))) {
+    gen(seg.slice(last, mt.index));
+    const cls = classifyPlaceholder(mt[0]) || "ph"; USED.add(cls);
+    out += `<span class="tok ${cls}">${esc(mt[0])}</span>`;
+    last = re.lastIndex;
+  }
+  gen(seg.slice(last));
+  return out;
+}
+const LEGEND = {
+  sens: "<mark class='sens'>敏感</mark> 原文检出并处理",
+  role: "<span class='tok role'>角色占位</span> 交易角色（甲方→PARTYA）",
+  ph:   "<span class='tok ph'>实体占位</span> 身份证/手机/账户等",
+  gen:  "<span class='tok gen'>泛化值</span> 金额→区间 / 地址→省",
+  cred: "<span class='tok cred'>密钥占位</span> 凭据",
+};
+function renderLegend() {
+  const order = ["sens", "role", "ph", "gen", "cred"];
+  const items = order.filter((k) => USED.has(k)).map((k) => `<span>${LEGEND[k]}</span>`);
+  $("#t_legend").innerHTML = items.join("");
+  $("#t_legend").style.display = items.length ? "" : "none";
+}
+function renderDiff(original, masked) {
+  USED = new Set();
+  const ops = diffOps(tokenize(original, false), tokenize(masked, true));
+  if (!ops) { // perf fallback: skip diff, still badge placeholders on the masked side
+    $("#t_before").textContent = original;
+    $("#t_after").innerHTML = renderInsert(masked);
+    renderLegend(); return;
+  }
+  let before = "", after = "";
+  for (const [t, c] of ops) {
+    if (t === "eq") { before += esc(c); after += esc(c); }
+    else if (t === "del") { USED.add("sens"); before += `<mark class="sens">${esc(c)}</mark>`; }
+    else { after += renderInsert(c); }
+  }
+  $("#t_before").innerHTML = before || '<span class="empty">（无内容）</span>';
+  $("#t_after").innerHTML = after || '<span class="empty">（无内容）</span>';
+  renderLegend();
+}
+
+async function runRedact() {
+  const text = $("#t_text").value; if (!text.trim()) return toast("先输入文本");
+  const body = { text };
+  // Checking this box may raise protection for a profile that normally omits
+  // NER. Leaving it unchecked must not send use_ner=false and accidentally ask
+  // the server to weaken an app-authorized profile.
+  if ($("#t_ner").checked) body.use_ner = true;
+  if (SAMPLE_APP && !$("#t_profile").value) body.app_id = SAMPLE_APP;
+  else if ($("#t_profile").value) body.profile = $("#t_profile").value;
+  const btn = $("#t_run"); btn.disabled = true; btn.textContent = "脱敏中…";
+  $("#t_before").textContent = "";
+  $("#t_after").textContent = "正在脱敏，请稍候…";
+  $("#t_legend").innerHTML = "";
+  $("#t_stats").style.display = "none";
+  $("#t_extra").innerHTML = "";
+  try {
+    const r = await api("POST", "/redact_snippet", body);
+    renderDiff(text, r.masked);
+    const rs = r.risk_summary || {};
+    $("#t_stats").style.display = "";
+    $("#s_detect").textContent = rs.detection_count || 0;
+    $("#s_ph").textContent = rs.placeholder_count || 0;
+    $("#s_gen").textContent = rs.generalized_count || 0;
+    const blocked = r.blocked_labels || [];
+    $("#s_block").textContent = blocked.length;
+    const lc = rs.label_counts || {};
+    const chips = Object.keys(lc).map((k) => `<span class="k">${esc(k)} <b>${lc[k]}</b></span>`).join("");
+    let extra = `<div class="kv" style="margin-top:14px"><span class="k">档位 <b>${esc(r.profile || "")}</b></span>${chips}</div>`;
+    if (blocked.length) extra += `<div class="blocked-note">⛔ 以下标签被档位策略<b>硬拦截</b>（fail-closed，不会发往云端）：${blocked.map(esc).join("、")}</div>`;
+    $("#t_extra").innerHTML = extra;
+  } catch (e) {
+    $("#t_after").textContent = "本次脱敏失败，未生成可用结果。";
+    $("#t_extra").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
+    toast("失败：" + e.message);
+  }
+  finally { btn.disabled = false; btn.textContent = "▶ 脱敏"; }
+}
+$("#t_run").onclick = runRedact;
+
+// --- workbench: file redaction & refill ---
+function download(name, content, type) {
+  const blob = new Blob([content], { type: type || "application/octet-stream" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function baseName(n) { return (n || "document").replace(/\.[^.]*$/, ""); }
+function downloadB64(name, b64, type) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: type || "application/octet-stream" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const WB = { taskId: null, base: "document", redacted: "", manifest: null };
+
+function resetFileResult() {
+  WB.taskId = null; WB.redacted = ""; WB.manifest = null;
+  for (const id of ["#f_egress", "#f_meta", "#f_warn"]) $(id).innerHTML = "";
+  $("#f_out").textContent = "正在脱敏，请稍候…";
+  for (const id of ["#f_dl_md", "#f_dl_manifest", "#f_pkg"]) $(id).disabled = true;
+}
+
+function renderEgress(eg) {
+  const box = $("#f_egress");
+  if (!eg) { box.innerHTML = ""; return; }
+  const ok = eg.egress_allowed;
+  const det = eg.detectors || {};
+  const active = (det.active || []).map(esc).join("、") || "—";
+  const missing = (det.required || []).filter((x) => !(det.active || []).includes(x));
+  const reasons = (eg.reasons || [])
+    .map((r) => `<li><b>${esc(r.code)}</b>：${esc(r.message)}</li>`).join("");
+  const dict = eg.dictionary || {};
+  box.innerHTML =
+    `<div class="blocked-note" style="${ok
+      ? "background:var(--ok-soft);color:var(--ok);border-color:#b9e8d4"
+      : ""}">${ok ? "✅ 出站闸门通过：脱敏产物可交给在线 AI" : "⛔ 禁止出站：以下问题须先解决"}</div>` +
+    (reasons ? `<ul style="margin:6px 0 0 18px;font-size:13px">${reasons}</ul>` : "") +
+    `<div class="kv" style="margin-top:8px">` +
+    `<span class="k">检测器 <b>${active}</b></span>` +
+    (missing.length ? `<span class="k">缺失必需 <b>${missing.map(esc).join("、")}</b></span>` : "") +
+    `<span class="k">残留扫描 <b>${esc((eg.residual_scan || {}).status || "—")}</b></span>` +
+    (dict.bound ? `<span class="k">词典版本 <b>${esc(String(dict.version || "—").slice(0, 12))}…</b></span>` : "") +
+    `</div>` +
+    `<p class="hint" style="margin-top:6px">${esc(eg.disclaimer || "")}</p>`;
+}
+
+$("#f_run").onclick = async () => {
+  const file = $("#f_file").files[0]; if (!file) return toast("请先选择文件");
+  const btn = $("#f_run"); btn.disabled = true; btn.textContent = "处理中…";
+  resetFileResult();
+  try {
+    const buf = await file.arrayBuffer();
+    const appId = $("#f_app").value;
+    const url = "/api/v1/documents/parse?filename=" + encodeURIComponent(file.name) +
+      (appId ? "&app_id=" + encodeURIComponent(appId) : "");
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+      body: buf,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+    if (!r.ok) throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
+    WB.taskId = data.task_id; WB.base = baseName(file.name);
+    WB.redacted = data.redacted_markdown; WB.manifest = data.manifest;
+    $("#f_out").textContent = WB.redacted;
+    const lc = data.label_counts || {};
+    $("#f_meta").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">文件 <b>${esc(data.file_name)}</b></span><span class="k">格式 <b>${esc(data.file_format)}</b></span><span class="k">task <b>${esc(data.task_id)}</b></span>` +
+      Object.keys(lc).map((k) => `<span class="k">${esc(k)} <b>${lc[k]}</b></span>`).join("") + `</div>`;
+    const warns = data.warnings || [];
+    $("#f_warn").innerHTML = warns.length
+      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map((w) => esc(w.code + "：" + w.message)).join("<br>")}</div>`
+      : "";
+    renderEgress(data.egress);
+    const canEgress = !!(data.egress && data.egress.egress_allowed);
+    // 出站类导出受闸门控制；恢复包导出（本地回填用）不受限
+    $("#f_dl_md").disabled = !canEgress; $("#f_dl_manifest").disabled = !canEgress;
+    $("#f_pkg").disabled = false;
+    toast(canEgress ? "脱敏完成，出站闸门通过" : "脱敏完成：仅本地预览，出站被阻断");
+  } catch (e) {
+    $("#f_out").textContent = "本次脱敏失败，未生成可用结果。";
+    $("#f_warn").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
+    toast("失败：" + e.message);
+  }
+  finally { btn.disabled = false; btn.textContent = "▶ 解析并脱敏"; }
+};
+$("#f_dl_md").onclick = () => download(WB.base + ".redacted.md", WB.redacted, "text/markdown");
+$("#f_dl_manifest").onclick = () => download(WB.base + ".manifest.json", JSON.stringify(WB.manifest, null, 2), "application/json");
+$("#f_pkg").onclick = async () => {
+  if (!WB.taskId) return toast("请先完成一次文件脱敏");
+  const pass = $("#f_pass").value; if (!pass) return toast("请先输入恢复包口令");
+  try {
+    const data = await api("POST", "/api/v1/documents/" + encodeURIComponent(WB.taskId) + "/package", { passphrase: pass });
+    download(WB.base + ".tuominmap", JSON.stringify(data.package, null, 2), "application/json");
+    $("#f_pass").value = ""; toast("恢复包已导出");
+  } catch (e) { toast("失败：" + e.message); }
+};
+
+// DOCX 原格式脱敏：选定 .docx 时显示入口
+$("#f_file").onchange = () => {
+  const f = $("#f_file").files[0];
+  $("#f_run_docx").style.display = f && /\.docx$/i.test(f.name) ? "" : "none";
+};
+async function runDocxRedact(oleStrip) {
+  const file = $("#f_file").files[0]; if (!file) return toast("请先选择文件");
+  const btn = $("#f_run_docx"); btn.disabled = true; btn.textContent = "处理中…";
+  resetFileResult();
+  try {
+    const buf = await file.arrayBuffer();
+    const appId = $("#f_app").value;
+    const url = "/api/v1/documents/redact-docx?filename=" + encodeURIComponent(file.name) +
+      (appId ? "&app_id=" + encodeURIComponent(appId) : "") +
+      (oleStrip ? "&ole_strip=true" : "");
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+      body: buf,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+    if (!r.ok && !oleStrip && data.error && data.error.code === "ole_object_present") {
+      $("#f_out").textContent = "本次脱敏被阻断，未生成可用结果。";
+      // OLE 嵌入对象（WPS 公式等二进制黑盒）：fail-closed 拦截，给两条出路
+      $("#f_warn").innerHTML =
+        `<div class="blocked-note">文档包含 OLE 嵌入对象（如 WPS 公式、嵌入表格），其二进制内容无法脱敏，已安全拦截。<br>` +
+        `处理方式：① 在 WPS/Word 中把嵌入对象转换为图片后重试；② ` +
+        `<button class="btn ghost sm" id="f_ole_retry" style="margin:4px 0">移除嵌入对象后继续（正文脱敏不受影响）</button></div>`;
+      $("#f_ole_retry").onclick = () => { $("#f_warn").innerHTML = ""; runDocxRedact(true); };
+      return;
+    }
+    if (!r.ok) {
+      if (data.egress) renderEgress(data.egress);
+      throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
+    }
+    WB.taskId = data.task_id; WB.base = baseName(file.name);
+    WB.redacted = ""; WB.manifest = null;
+    renderEgress(data.egress);
+    downloadB64(WB.base + ".redacted.docx", data.redacted_docx_b64, DOCX_MIME);
+    $("#f_meta").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">文件 <b>${esc(data.file_name)}</b></span><span class="k">task <b>${esc(data.task_id)}</b></span></div>`;
+    const warns = data.warnings || [];
+    $("#f_warn").innerHTML = warns.length
+      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map((w) => esc(w.code + "：" + w.message)).join("<br>")}</div>`
+      : "";
+    $("#f_out").innerHTML = '<span class="empty">原格式脱敏完成，脱敏 DOCX 已下载。本页预览请使用「解析并脱敏」（Markdown 路径）。</span>';
+    $("#f_dl_md").disabled = true; $("#f_dl_manifest").disabled = true; $("#f_pkg").disabled = false;
+    toast("原格式脱敏完成，已下载 .redacted.docx");
+  } catch (e) {
+    $("#f_out").textContent = "本次脱敏失败，未生成可用结果。";
+    $("#f_warn").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
+    toast("失败：" + e.message);
+  }
+  finally { btn.disabled = false; btn.textContent = "▶ 原格式脱敏（DOCX）"; }
+}
+$("#f_run_docx").onclick = () => runDocxRedact(false);
+
+// DOCX 原格式回填
+$("#r_docx_run").onclick = async () => {
+  const f = $("#r_docx").files[0]; if (!f) return toast("请先选择脱敏 DOCX");
+  if (!RF.pkg) return toast("请先选择恢复包");
+  const pass = $("#r_pass").value; if (!pass) return toast("请输入恢复包口令");
+  try {
+    const buf = await f.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const r = await fetch("/api/v1/documents/refill-docx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+      body: JSON.stringify({ package: RF.pkg, passphrase: pass, redacted_docx_b64: btoa(binary) }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+    if (data.status === "blocked" || !r.ok) {
+      const types = (data.error_types || []).map(esc).join("、");
+      const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+      $("#r_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>`;
+      return;
+    }
+    const base = baseName(f.name).replace(/\.redacted$/, "");
+    downloadB64(base + ".restored.docx", data.restored_docx_b64, DOCX_MIME);
+    $("#r_diff").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">模式 <b>${esc(data.mode === "exact" ? "未编辑" : "已经过编辑/重存")}</b></span><span class="k">恢复条数 <b>${data.restored_count}</b></span></div>`;
+    toast("回填完成，已下载 .restored.docx");
+  } catch (e) { toast("失败：" + e.message); }
+};
+
+const RF = { md: "", pkg: null, restored: "", base: "document" };
+$("#r_md").onchange = async () => {
+  const f = $("#r_md").files[0];
+  RF.md = f ? await f.text() : "";
+  RF.base = f ? baseName(f.name).replace(/\.redacted$/, "") : "document";
+};
+$("#r_pkg").onchange = async () => {
+  const f = $("#r_pkg").files[0]; RF.pkg = null;
+  if (f) { try { RF.pkg = JSON.parse(await f.text()); } catch { toast("恢复包不是有效 JSON"); } }
+};
+function renderDiffLists(diff) {
+  const names = [["unknown", "未知占位符"], ["altered", "损坏占位符"], ["missing", "已删除占位符"], ["duplicated", "重复占位符"]];
+  const parts = names.filter(([k]) => (diff[k] || []).length)
+    .map(([k, label]) => `<span class="k">${label} <b>${diff[k].map(esc).join("、")}</b></span>`);
+  return parts.length ? `<div class="kv" style="margin-top:12px">${parts.join("")}</div>` : "";
+}
+async function doRefill(confirm) {
+  if (!RF.md) return toast("请先选择脱敏 MD 文件");
+  if (!RF.pkg) return toast("请先选择恢复包");
+  const pass = $("#r_pass").value; if (!pass) return toast("请输入恢复包口令");
+  const r = await fetch("/api/v1/documents/refill", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+    body: JSON.stringify({ redacted_markdown: RF.md, package: RF.pkg, passphrase: pass, confirm_edited: confirm }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+  if (data.status === "needs_confirmation") {
+    $("#r_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 文件已被编辑（mode: ${esc(data.mode)}），请核对占位符差异：</div>` + renderDiffLists(data.diff || {});
+    $("#r_confirm_row").style.display = "";
+    return;
+  }
+  if (data.status === "blocked" || !r.ok) {
+    $("#r_confirm_row").style.display = "none";
+    const types = (data.error_types || []).map(esc).join("、");
+    const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+    $("#r_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>` + renderDiffLists(data.diff || {});
+    return;
+  }
+  RF.restored = data.restored_markdown;
+  $("#r_out").textContent = RF.restored;
+  $("#r_diff").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">模式 <b>${esc(data.mode === "exact" ? "未编辑（严格校验）" : "已编辑（确认后回填）")}</b></span></div>`;
+  $("#r_confirm_row").style.display = "none";
+  $("#r_dl").disabled = false; toast("回填完成");
+}
+$("#r_run").onclick = () => doRefill(false).catch((e) => toast("失败：" + e.message));
+$("#r_confirm_btn").onclick = () => {
+  if (!$("#r_confirm").checked) return toast("请先勾选确认");
+  doRefill(true).catch((e) => toast("失败：" + e.message));
+};
+$("#r_dl").onclick = () => download(RF.base + ".restored.md", RF.restored, "text/markdown");
+
+// --- answer refill tab ---
+const AN = { pkg: null, restored: "" };
+$("#an_file").onchange = async () => {
+  const f = $("#an_file").files[0];
+  if (f) $("#an_text").value = await f.text();
+};
+$("#an_pkg").onchange = async () => {
+  const f = $("#an_pkg").files[0]; AN.pkg = null;
+  if (f) { try { AN.pkg = JSON.parse(await f.text()); } catch { toast("恢复包不是有效 JSON"); } }
+};
+function renderAnswerSummary(s) {
+  if (!s) return "";
+  const chips = (s.matched || []).map((m) => `<span class="k">${esc(m.placeholder)} <b>${m.count}</b></span>`).join("");
+  const unused = (s.unused || []).length ? `<span class="k">未使用 <b>${s.unused.map(esc).join("、")}</b></span>` : "";
+  return `<div class="kv" style="margin-top:12px"><span class="k">恢复条数 <b>${s.restored_count}</b></span>${chips}${unused}</div>`;
+}
+async function doAnswerRefill(confirmEmpty) {
+  const text = $("#an_text").value;
+  if (!text.trim()) return toast("请粘贴或导入 AI 回答");
+  if (!AN.pkg) return toast("请先选择恢复包");
+  const pass = $("#an_pass").value; if (!pass) return toast("请输入恢复包口令");
+  const r = await fetch("/api/v1/documents/refill-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+    body: JSON.stringify({ answer_markdown: text, package: AN.pkg, passphrase: pass, confirm_empty: confirmEmpty }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+  if (data.status === "needs_confirmation") {
+    $("#an_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 回答中未命中任何占位符——可能选错了恢复包，或 AI 确实没有引用。请确认后再继续。</div>` + renderAnswerSummary(data.summary);
+    $("#an_confirm_row").style.display = "";
+    return;
+  }
+  if (data.status === "blocked" || !r.ok) {
+    $("#an_confirm_row").style.display = "none";
+    const types = (data.error_types || []).map(esc).join("、");
+    const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+    $("#an_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>` + renderDiffLists(data.diff || {});
+    return;
+  }
+  AN.restored = data.restored_markdown;
+  $("#an_out").textContent = AN.restored;
+  $("#an_diff").innerHTML = renderAnswerSummary(data.summary);
+  $("#an_confirm_row").style.display = "none";
+  $("#an_dl").disabled = false; toast("回填完成");
+}
+$("#an_run").onclick = () => doAnswerRefill(false).catch((e) => toast("失败：" + e.message));
+$("#an_confirm_btn").onclick = () => {
+  if (!$("#an_confirm").checked) return toast("请先勾选确认");
+  doAnswerRefill(true).catch((e) => toast("失败：" + e.message));
+};
+$("#an_dl").onclick = () => download("answer.restored.md", AN.restored, "text/markdown");
+
+// --- trusted preview tab ---
+const PV = { pkg: null, restored: "", lockTimer: null };
+function highlightPH(text) {
+  return esc(text).replace(/&lt;([A-Z][A-Z0-9_]*)&gt;/g,
+    '<mark style="background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:0 2px">&lt;$1&gt;</mark>');
+}
+function phCounts(text) {
+  const counts = {};
+  (text.match(/<([A-Z][A-Z0-9_]*)>/g) || []).forEach((m) => {
+    const label = m.slice(1, -1).replace(/_\d+$/, "");
+    counts[label] = (counts[label] || 0) + 1;
+  });
+  const keys = Object.keys(counts);
+  return keys.length
+    ? keys.sort().map((k) => `<span class="k">${esc(k)} <b>${counts[k]}</b></span>`).join("")
+    : "";
+}
+function renderPreview(text, outSel, countSel) {
+  $(outSel).innerHTML = text ? highlightPH(text) : '<span class="empty">（空）</span>';
+  $(countSel).innerHTML = phCounts(text);
+}
+$("#pv_orig").onchange = async () => {
+  const f = $("#pv_orig").files[0];          // 本机 FileReader，从不上传
+  if (f) renderPreview(await f.text(), "#pv_orig_out", "#pv_orig_counts");
+};
+$("#pv_red").onchange = async () => {
+  const f = $("#pv_red").files[0];
+  if (f) renderPreview(await f.text(), "#pv_red_out", "#pv_red_counts");
+};
+$("#pv_ans").onchange = async () => {
+  const f = $("#pv_ans").files[0];
+  if (f) { const t = await f.text(); $("#pv_ans_text").value = t; renderPreview(t, "#pv_ans_out", "#pv_ans_counts"); }
+};
+$("#pv_ans_text").oninput = () => renderPreview($("#pv_ans_text").value, "#pv_ans_out", "#pv_ans_counts");
+$("#pv_pkg").onchange = async () => {
+  const f = $("#pv_pkg").files[0]; PV.pkg = null;
+  if (f) { try { PV.pkg = JSON.parse(await f.text()); } catch { toast("恢复包不是有效 JSON"); } }
+};
+async function pvRefill(confirmEmpty) {
+  const text = $("#pv_ans_text").value;
+  if (!text.trim()) return toast("请先导入或粘贴 AI 回答");
+  if (!PV.pkg) return toast("请先选择恢复包");
+  const pass = $("#pv_pass").value; if (!pass) return toast("请输入恢复包口令");
+  const r = await fetch("/api/v1/documents/refill-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+    body: JSON.stringify({ answer_markdown: text, package: PV.pkg, passphrase: pass, confirm_empty: confirmEmpty }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置。");
+  if (data.status === "needs_confirmation") {
+    $("#pv_msg").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 未命中任何占位符。<button class="btn sm" id="pv_force">确认按原文返回</button></div>`;
+    $("#pv_force").onclick = () => pvRefill(true).catch((e) => toast("失败：" + e.message));
+    return;
+  }
+  if (data.status === "blocked" || !r.ok) {
+    const types = (data.error_types || []).map(esc).join("、");
+    $("#pv_msg").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(types || (data.error && data.error.message) || ("HTTP " + r.status))}</div>` + renderDiffLists(data.diff || {});
+    return;
+  }
+  PV.restored = data.restored_markdown;
+  renderPreview(PV.restored, "#pv_ref_out", "#pv_msg");
+  $("#pv_ref_dl").disabled = false; toast("回填完成");
+}
+$("#pv_refill").onclick = () => pvRefill(false).catch((e) => toast("失败：" + e.message));
+$("#pv_ref_dl").onclick = () => download("answer.restored.md", PV.restored, "text/markdown");
+
+function lockMapping(note) {
+  clearTimeout(PV.lockTimer); PV.lockTimer = null;
+  $("#pv_map").innerHTML = "";
+  $("#pv_lock").disabled = true;
+  $("#pv_lock_state").textContent = note || "";
+}
+$("#pv_lock").onclick = () => lockMapping("已手动锁定");
+$$("#tabs button").forEach((b) => b.addEventListener("click", () => lockMapping("已随标签切换锁定")));
+$("#pv_unlock").onclick = async () => {
+  if (!PV.pkg) return toast("请先选择恢复包");
+  const pass = $("#pv_pass").value; if (!pass) return toast("请输入恢复包口令");
+  try {
+    const data = await api("POST", "/api/v1/documents/unlock-mapping", { package: PV.pkg, passphrase: pass });
+    const rows = (data.entries || []).map((e) =>
+      `<tr><td><b>${esc(e.placeholder)}</b></td><td>${esc(e.label)}</td><td>${esc(e.original_value)}</td></tr>`).join("");
+    $("#pv_map").innerHTML = `<table style="margin-top:10px"><thead><tr><th>占位符</th><th>标签</th><th>原值</th></tr></thead><tbody>${rows}</tbody></table>`;
+    $("#pv_lock").disabled = false;
+    $("#pv_lock_state").textContent = "已解锁，90 秒后自动锁定";
+    clearTimeout(PV.lockTimer);
+    PV.lockTimer = setTimeout(() => lockMapping("已自动锁定"), 90000);
+  } catch (e) { toast("解锁失败：" + e.message); }
+};
+
+// --- records tab ---
+function fmtTime(ts) { try { return new Date(ts * 1000).toLocaleString(); } catch { return String(ts); } }
+function fmtCounts(obj) {
+  const entries = Object.entries(obj || {});
+  return entries.length ? entries.map(([k, v]) => `${esc(k)}:${v}`).join(" ") : "—";
+}
+async function loadRecords() {
+  try {
+    const { jobs } = await api("GET", "/api/v1/documents/jobs?limit=100");
+    if (!jobs.length) { $("#recJobs").innerHTML = "<div class='empty'>暂无文件任务。</div>"; }
+    else {
+      let h = "<table><thead><tr><th>时间</th><th>文件</th><th>格式</th><th>状态</th><th>标签计数</th><th>task_id</th><th></th></tr></thead><tbody>";
+      for (const j of jobs) {
+        h += `<tr><td class="meta">${fmtTime(j.created_at)}</td><td><b>${esc(j.file_name)}</b></td><td>${esc(j.file_format)}</td><td>${esc(j.status)}${j.error ? " · " + esc(j.error) : ""}</td><td class="meta">${fmtCounts(j.label_counts_json)}</td><td class="meta">${esc(j.task_id)}</td><td><button class="btn danger" data-deljob="${esc(j.task_id)}">删除</button></td></tr>`;
+      }
+      $("#recJobs").innerHTML = h + "</tbody></table>";
+      $$("#recJobs [data-deljob]").forEach((b) => b.onclick = () => delJob(b.dataset.deljob));
+    }
+    const { calls } = await api("GET", "/api/v1/documents/calls?limit=100");
+    if (!calls.length) { $("#recCalls").innerHTML = "<div class='empty'>暂无调用记录。</div>"; }
+    else {
+      let h = "<table><thead><tr><th>时间</th><th>入口</th><th>app</th><th>耗时</th><th>字符数</th><th>标签计数</th><th>阻断</th></tr></thead><tbody>";
+      for (const c of calls) {
+        h += `<tr><td class="meta">${fmtTime(c.ts)}</td><td>${esc(c.entry)}</td><td>${esc(c.app_id)}</td><td class="meta">${c.duration_ms}ms</td><td class="meta">${c.char_count}</td><td class="meta">${fmtCounts(c.label_counts_json)}</td><td>${c.blocked ? "⛔" : "—"}</td></tr>`;
+      }
+      $("#recCalls").innerHTML = h + "</tbody></table>";
+    }
+  } catch (e) { $("#recJobs").innerHTML = "<div class='empty'>" + esc(e.message) + "</div>"; }
+}
+async function delJob(taskId) {
+  if (!confirm("删除任务 " + taskId + "？其映射授权将一并删除，不可恢复。")) return;
+  try { await api("DELETE", "/api/v1/documents/jobs/" + encodeURIComponent(taskId)); toast("已删除"); loadRecords(); }
+  catch (e) { toast("失败：" + e.message); }
+}
+$("#rec_refresh").onclick = loadRecords;
+$$("#tabs button").forEach((b) => { if (b.dataset.tab === "records") b.addEventListener("click", loadRecords); });
+
+// --- 离线授权 ---
+function renderLicense(data) {
+  const banner = $("#licenseBanner"), badge = $("#licenseCustomer");
+  const stateLabels = { unlicensed: "未激活", valid: "有效", grace: "宽限期", expired: "已过期" };
+  if (data.customer) { badge.textContent = "授权使用：" + data.customer; badge.style.display = ""; }
+  else if (data.delivery_customer) { badge.textContent = "交付单位：" + data.delivery_customer; badge.style.display = ""; }
+  else { badge.textContent = ""; badge.style.display = "none"; }
+  if (data.enforcement !== "enabled") {
+    $("#licenseStatus").textContent = "社区源码版：无需激活；管理 Token 用于访问控制，与软件许可证无关";
+    $("#licenseKv").innerHTML = "";
+    banner.style.display = "none"; banner.textContent = "";
+    return;
+  }
+  const state = stateLabels[data.state] || data.state || "未激活";
+  $("#licenseStatus").innerHTML = `当前状态：<b>${esc(state)}</b>`;
+  $("#licenseKv").innerHTML =
+    `<span class="k">客户 <b>${esc(data.customer || "—")}</b></span>` +
+    `<span class="k">license_id <b>${esc(data.license_id || "—")}</b></span>` +
+    `<span class="k">到期时间 <b>${esc(data.expires_at || "—")}</b></span>` +
+    `<span class="k">剩余天数 <b>${esc(data.days_left == null ? "—" : data.days_left)}</b></span>` +
+    `<span class="k">宽限期 <b>${esc(data.grace_days == null ? "—" : data.grace_days)} 天</b></span>`;
+  let message = "", warn = false;
+  if (data.state === "grace") {
+    const date = data.expires_at ? String(data.expires_at).slice(0, 10) : "—";
+    message = `授权将于 ${data.days_left == null ? "—" : data.days_left} 天后到期（${date}）。宽限期 ${data.grace_days == null ? 30 : data.grace_days} 天内功能不受影响，请及时联系发行方续期。`;
+    warn = true;
+  } else if (data.state === "unlicensed") {
+    message = "未激活授权：新建脱敏/代理任务已被拦截。请在「授权」页粘贴授权码激活；已有数据的回填与导出不受影响。";
+  } else if (data.state === "expired") {
+    message = "授权已过期且宽限期已结束：新建任务已停止；已有数据的回填与导出不受影响，续期请联系发行方。";
+  }
+  if (message) {
+    banner.textContent = message;
+    banner.style.display = "block";
+    banner.style.background = warn ? "var(--warn-soft)" : "var(--danger-soft)";
+    banner.style.color = warn ? "var(--warn)" : "var(--danger)";
+    banner.style.borderColor = warn ? "#f3dcae" : "#f6c9d3";
+  } else {
+    banner.style.display = "none"; banner.textContent = "";
+  }
+}
+
+async function loadLicense() {
+  try {
+    const data = await api("GET", "/api/v1/license/status");
+    renderLicense(data);
+    return data;
+  } catch (e) {
+    $("#licenseStatus").innerHTML = '<span style="color:var(--danger)">加载失败：' + esc(e.message) + "</span>";
+    $("#licenseKv").innerHTML = "";
+    $("#licenseBanner").style.display = "none";
+    return null;
+  }
+}
+
+$("#licenseActivate").onclick = async () => {
+  const code = $("#licenseCode").value.trim();
+  if (!code) return toast("请先粘贴授权码");
+  const btn = $("#licenseActivate");
+  btn.disabled = true; btn.textContent = "激活中…";
+  $("#licenseError").textContent = "";
+  try {
+    const data = await api("POST", "/api/v1/license/activate", { code });
+    $("#licenseCode").value = "";
+    renderLicense(data);
+    toast("授权已激活");
+    await loadLicense();
+  } catch (e) {
+    $("#licenseError").textContent = e.message;
+    toast("激活失败：" + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "激活";
+  }
+};
+
+function refreshAll() { loadSettings().then(loadAppsIntoSelectors).then(() => { if ($("#tab-onboard") && $("#tab-onboard").classList.contains("active")) wbPlan(); }).catch((e) => toast(e.message)); loadLicense(); }
+refreshTokenMeta();
+refreshAll();
+</script>
+</body>
+</html>

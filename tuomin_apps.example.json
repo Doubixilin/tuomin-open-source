@@ -1,0 +1,14 @@
+{
+  "_comment": "仅合成研究示例，明确禁用模型；不能用此设置代替真实业务的检测要求。",
+  "apps": {
+    "research_demo": {
+      "profile": {
+        "base": "standard",
+        "name": "synthetic_research",
+        "use_ner": false,
+        "ner_required": false
+      },
+      "dictionary": "tests/fixtures/synthetic_dictionary.json"
+    }
+  }
+}

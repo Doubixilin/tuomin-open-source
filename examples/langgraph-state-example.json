@@ -1,0 +1,17 @@
+{
+  "task_id": "task_2b3c4d5e6f7a",
+  "raw_text": {
+    "local_only": true,
+    "value": "Synthetic Team Alpha contact 13900001111 for the local gateway demo."
+  },
+  "redacted_text": "Synthetic Team Alpha contact <CONTACT_001> for the local gateway demo.",
+  "risk_summary": {
+    "total": 1,
+    "by_label": {
+      "CONTACT": 1
+    }
+  },
+  "llm_text": "The hosted model only saw <CONTACT_001> and returned a synthetic summary.",
+  "refill_status": "pending",
+  "review_reason": null
+}

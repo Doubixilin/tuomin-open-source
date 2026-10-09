@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tuomin-gateway"
+version = "0.1.0"
+description = "脱敏网关：本地规则与词典脱敏、占位符映射及严格回填的研究参考实现"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["cryptography>=46,<47"]
+
+[project.optional-dependencies]
+serve = ["fastapi>=0.110,<1", "uvicorn>=0.27,<1", "httpx>=0.27,<1"]
+document = ["openpyxl>=3.1,<4", "xlrd>=2.0,<3"]
+# PyMuPDF has its own AGPL/commercial terms; see THIRD_PARTY_NOTICES.md.
+pdf = ["pymupdf>=1.24,<2"]
+ner = ["transformers>=4.40,<6", "torch>=2.0,<3"]
+dev = ["pytest>=8,<10", "fastapi>=0.110,<1", "uvicorn>=0.27,<1", "httpx>=0.27,<1", "openpyxl>=3.1,<4", "xlrd>=2.0,<3"]
+
+[project.scripts]
+tuomin-gateway = "tuomin_gateway.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tuomin_gateway = ["service/static/*.html", "service/static/*.css", "document/vendor/NOTICE.md"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]

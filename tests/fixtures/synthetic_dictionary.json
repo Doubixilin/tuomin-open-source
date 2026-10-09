@@ -1,0 +1,42 @@
+[
+  {
+    "entry_id": "dict_000001",
+    "canonical_value": "示例建设单位A",
+    "aliases": ["示建A", "示例甲方"],
+    "label": "ORG",
+    "risk_level": "high",
+    "version": "2026.06.12"
+  },
+  {
+    "entry_id": "dict_000002",
+    "canonical_value": "测试绿洲项目",
+    "aliases": ["绿洲MVP", "测试项目甲"],
+    "label": "PROJECT",
+    "risk_level": "high",
+    "version": "2026.06.12"
+  },
+  {
+    "entry_id": "dict_000003",
+    "canonical_value": "合成供应商乙",
+    "aliases": ["供应商乙方", "乙方测试供应商"],
+    "label": "SUPPLIER",
+    "risk_level": "high",
+    "version": "2026.06.12"
+  },
+  {
+    "entry_id": "dict_000004",
+    "canonical_value": "示例法务部",
+    "aliases": ["法务测试部"],
+    "label": "DEPARTMENT",
+    "risk_level": "medium",
+    "version": "2026.06.12"
+  },
+  {
+    "entry_id": "dict_000005",
+    "canonical_value": "合成A-01地块",
+    "aliases": ["A01测试地块"],
+    "label": "LAND_PARCEL",
+    "risk_level": "high",
+    "version": "2026.06.12"
+  }
+]

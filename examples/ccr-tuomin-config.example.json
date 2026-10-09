@@ -1,0 +1,29 @@
+{
+  "transformers": [
+    {
+      "name": "tuomin",
+      "path": "/absolute/path/to/tuomin/integrations/ccr/tuomin-transformer.cjs",
+      "options": {
+        "baseUrl": "http://127.0.0.1:8765",
+        "appId": "agent",
+        "includeSystem": false,
+        "failOnBlocked": true,
+        "failOnUnknownPlaceholders": true,
+        "requestTimeoutMs": 5000
+      }
+    }
+  ],
+  "Providers": [
+    {
+      "name": "deepseek",
+      "api_base_url": "https://api.deepseek.com/chat/completions",
+      "api_key": "EXAMPLE_ONLY_NO_SECRET",
+      "transformer": {
+        "use": ["tuomin", "deepseek"]
+      }
+    }
+  ],
+  "Router": {
+    "default": "deepseek,deepseek-chat"
+  }
+}

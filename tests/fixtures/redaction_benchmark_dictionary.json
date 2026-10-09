@@ -1,0 +1,191 @@
+[
+  {
+    "label": "ORG",
+    "canonical_value": "示例建设集团",
+    "entry_id": "k0",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "东方示例研究院",
+    "entry_id": "k1",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "测试星河项目",
+    "entry_id": "k2",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "启明测试工程",
+    "entry_id": "k3",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "SUPPLIER",
+    "canonical_value": "示范供应链有限公司",
+    "entry_id": "k4",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "DEPARTMENT",
+    "canonical_value": "法务测试部",
+    "entry_id": "k5",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "星桥模拟控股",
+    "entry_id": "k6",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "蓝湖测试基金",
+    "entry_id": "k7",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "云岭模拟产业园",
+    "entry_id": "k8",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "LAND_PARCEL",
+    "canonical_value": "南岸样本地块",
+    "entry_id": "k9",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "SUPPLIER",
+    "canonical_value": "青禾测试材料",
+    "entry_id": "k10",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "DEPARTMENT",
+    "canonical_value": "合成风控委员会",
+    "entry_id": "k11",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "星云示例平台",
+    "entry_id": "k12",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "北辰测试制造",
+    "entry_id": "k13",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "卓然模拟律所",
+    "entry_id": "k14",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "DEPARTMENT",
+    "canonical_value": "融景示例部",
+    "entry_id": "k15",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "ORG",
+    "canonical_value": "虚构星罗资本",
+    "entry_id": "k16",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "SUPPLIER",
+    "canonical_value": "虚构航标服务",
+    "entry_id": "k17",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "银桐样本计划",
+    "entry_id": "k18",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "虚构样板枢纽一期",
+    "entry_id": "k19",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  },
+  {
+    "label": "PROJECT",
+    "canonical_value": "样本港二期自动化线",
+    "entry_id": "k20",
+    "aliases": [],
+    "risk_level": "high",
+    "status": "active",
+    "version": "eval"
+  }
+]
