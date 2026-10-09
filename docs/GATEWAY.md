@@ -39,6 +39,29 @@ sequenceDiagram
 
 ## 配置示例：先接通保留占位符的模式
 
+```mermaid
+flowchart TB
+    CLIENT["客户端设置"] --> BASE["本地 Base URL<br/>127.0.0.1:8765/apps/gateway_demo/v1"]
+    CLIENT --> KEY["上游 API Key 与模型 ID<br/>自行准备，不写进示例仓库"]
+    BASE --> ROUTE["按应用代理路由<br/>gateway_demo 绑定应用策略"]
+    CONFIG["本地 tuomin_apps.json"] --> PROFILE["检测策略<br/>use_ner + ner_required"]
+    CONFIG --> DICT["词典路径<br/>合成示例或自行审阅的业务词典"]
+    CONFIG --> TARGET["proxy_upstreams<br/>完整的兼容上游端点"]
+    PROFILE --> ROUTE
+    DICT --> ROUTE
+    NER["本地 NER 权重目录<br/>通过 TUOMIN_NER_MODEL_DIR 指定"] -.-> ROUTE
+    ROUTE --> ENGINE["本地检测与脱敏<br/>按策略阻断或生成占位符"]
+    ENGINE --> FORWARD["检查通过后转发"]
+    TARGET --> FORWARD
+    KEY --> FORWARD
+    FORWARD --> PROVIDER["外部提供方<br/>模型服务及鉴权不在本仓库"]
+    CONFIG --> REFILL["allow_auto_refill<br/>仅影响明确选择自动回填地址的请求"]
+    classDef external fill:#fff8e6,stroke:#a66b00,stroke-dasharray:5 5;
+    class NER,PROVIDER external;
+```
+
+配置图中的端点与序列图配合阅读：客户端填写本机地址，网关配置真实上游地址；NER 目录属于本地检测配置，不能填成上游聊天模型地址。管理 Token、API 能力 Token 和上游 API Key 有不同用途，不共用。
+
 以下配置用于说明连接关系。它不会下载模型，不包含有效上游地址、凭据或真实业务词典；替换所需项并验证后才能实际使用。
 
 1. 安装服务与 NER 依赖：`python -m pip install '.[serve,ner]'`。
@@ -103,4 +126,4 @@ sequenceDiagram
 - 启动后检查 `/readiness`，确认 NER 加载与应用配置，再用合成文本核对占位符、返回模式和异常阻断；`/healthz` 成功只表示进程存活。
 - 本仓库代理回归测试使用模拟上游验证逻辑，不等同于已验证你的模型、供应商与客户端组合。此文档和图没有宣称已完成真实 NER 或外部服务联调。
 
-实现入口：`src/tuomin_gateway/service/proxy.py`（路由、转发和回填）、`service/registry.py`（应用配置）、`session.py`（检测与会话映射）。后三者的路径均相对 `src/tuomin_gateway/`。完整模块说明见 [架构文档](ARCHITECTURE.md)。
+实现入口：`service/proxy.py`（路由、转发和回填）、`service/registry.py`（应用配置）、`session.py`（检测与会话映射），路径均相对 `src/tuomin_gateway/`。完整模块说明见 [架构文档](ARCHITECTURE.md)，功能与数据边界见 [设计思路](DESIGN.md)。

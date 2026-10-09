@@ -9,7 +9,7 @@
 支持自定义 API 地址的应用，可以将兼容请求先交给本机脱敏网关：本地规则、词典和 NER 共同检测，按应用策略替换敏感值，再转发到配置好的上游模型服务。原值映射留在本地；响应默认保留占位符，也可为受信任的本地应用显式启用自动回填。
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph LOCAL["本机运行环境"]
         APP["AI 客户端 / 自有应用<br/>自行配置网关地址"]
         subgraph CODE["本仓库提供的网关代码"]
@@ -39,6 +39,17 @@ flowchart LR
 例如，OpenAI Chat Completions 兼容客户端可将 Base URL 设为 `http://127.0.0.1:8765/apps/gateway_demo/v1`。该地址需先注册应用、配置上游并准备本地检测器；当前不是通用协议转换器，也不自动代理应用的其他网络请求。
 
 详细配置、两种响应模式和接口边界见 [网关接入说明](docs/GATEWAY.md)。
+
+## 用图理解完整设计
+
+这些图描述公开源码已经实现的处理路径，并把额外依赖、配置条件和失败分支一起画出。完整 NER 路径需要另行准备权重；图示不是本次已经完成模型联调或准确率验证的证明。
+
+| 想了解什么 | 图文入口 |
+| --- | --- |
+| 为什么采用本地脱敏与可信回填、有哪些功能 | [设计思路、数据边界和功能总览](docs/DESIGN.md) |
+| 各层怎样协作，规则、词典、NER 如何融合 | [技术架构、检测流水线和 NER 实现](docs/ARCHITECTURE.md) |
+| 文本、文件、回答和长期上下文分别怎样处理 | [工作流程、回填决策和映射生命周期](docs/WORKFLOWS.md) |
+| 客户端怎样配置网关，请求和响应怎样转发 | [网关配置关系和请求时序](docs/GATEWAY.md) |
 
 ## 先跑通一个不依赖模型的示例
 
@@ -94,7 +105,9 @@ macOS 服务映射默认使用钥匙串支持的加密，Windows 使用 DPAPI；
 
 ## 阅读路线与外部资源
 
-- [核心流程和代码入口](docs/ARCHITECTURE.md)
+- [设计思路、功能总览与数据边界](docs/DESIGN.md)
+- [技术架构与代码入口](docs/ARCHITECTURE.md)
+- [文本、文件、回填与映射工作流程](docs/WORKFLOWS.md)
 - [作为本地 AI 网关使用：配置与请求流程](docs/GATEWAY.md)
 - [模型与第三方资源索引、准备方法](docs/EXTERNAL_RESOURCES.md)
 - [能力范围和安全边界](docs/BOUNDARIES.md)
