@@ -6,6 +6,7 @@ structural tail and the rest leaks as plaintext (e.g. "<ORG>理股权投资项�
 from tuomin_gateway.detectors.ner import (
     _extend_right,
     _postprocess_model_spans,
+    _resolve_device,
     _split_on_newlines,
 )
 from tuomin_gateway.schemas import DetectionSpan, hash_text
@@ -266,8 +267,8 @@ def test_cluener_pipeline_loads_transformers_with_local_files_only(monkeypatch):
             calls.append(("model", model_name, local_files_only, revision))
             return object()
 
-    def fake_pipeline(task, *, model, tokenizer, aggregation_strategy):
-        calls.append(("pipeline", task, aggregation_strategy, model is not None, tokenizer is not None))
+    def fake_pipeline(task, *, model, tokenizer, aggregation_strategy, device):
+        calls.append(("pipeline", task, aggregation_strategy, model is not None, tokenizer is not None, device))
         return lambda text: []
 
     monkeypatch.setitem(
@@ -289,5 +290,61 @@ def test_cluener_pipeline_loads_transformers_with_local_files_only(monkeypatch):
     assert calls == [
         ("tokenizer", "synthetic-local-model", True, "synthetic-revision"),
         ("model", "synthetic-local-model", True, "synthetic-revision"),
-        ("pipeline", "token-classification", "simple", True, True),
+        ("pipeline", "token-classification", "simple", True, True, -1),
     ]
+
+
+def test_ner_device_defaults_to_cpu(monkeypatch):
+    monkeypatch.delenv("TUOMIN_NER_DEVICE", raising=False)
+    assert _resolve_device() == -1
+
+
+def test_ner_device_cpu_spellings_and_unknown_values_stay_on_cpu(monkeypatch):
+    for value in ("", "cpu", "CPU", "-1", "bogus"):
+        monkeypatch.setenv("TUOMIN_NER_DEVICE", value)
+        assert _resolve_device() == -1, value
+
+
+def test_ner_device_cuda_falls_back_without_a_visible_device(monkeypatch):
+    _install_fake_torch(monkeypatch, available=False, count=0)
+    for value in ("cuda", "auto", "gpu", "0"):
+        monkeypatch.setenv("TUOMIN_NER_DEVICE", value)
+        assert _resolve_device() == -1, value
+
+
+def test_ner_device_selects_the_requested_visible_cuda_index(monkeypatch):
+    _install_fake_torch(monkeypatch, available=True, count=2)
+    for value, expected in (("cuda", 0), ("auto", 0), ("0", 0), ("1", 1), ("2", -1)):
+        monkeypatch.setenv("TUOMIN_NER_DEVICE", value)
+        assert _resolve_device() == expected, value
+
+
+def _install_fake_torch(monkeypatch, *, available, count, mps=None):
+    import sys
+    from types import SimpleNamespace
+
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: available, device_count=lambda: count),
+    )
+    if mps is not None:
+        fake.backends = SimpleNamespace(mps=SimpleNamespace(is_available=lambda: mps))
+    monkeypatch.setitem(sys.modules, "torch", fake)
+
+
+def test_ner_device_mps_is_opt_in_and_falls_back(monkeypatch):
+    _install_fake_torch(monkeypatch, available=False, count=0, mps=True)
+    for value, expected in (("mps", "mps"), ("auto", "mps"), ("cuda", -1), ("", -1)):
+        monkeypatch.setenv("TUOMIN_NER_DEVICE", value)
+        assert _resolve_device() == expected, value
+    _install_fake_torch(monkeypatch, available=False, count=0, mps=False)
+    for value in ("mps", "auto"):
+        monkeypatch.setenv("TUOMIN_NER_DEVICE", value)
+        assert _resolve_device() == -1, value
+
+
+def test_ner_device_auto_prefers_cuda_and_mps_never_selects_cuda(monkeypatch):
+    _install_fake_torch(monkeypatch, available=True, count=1, mps=True)
+    monkeypatch.setenv("TUOMIN_NER_DEVICE", "auto")
+    assert _resolve_device() == 0
+    monkeypatch.setenv("TUOMIN_NER_DEVICE", "mps")
+    assert _resolve_device() == "mps"

@@ -9,6 +9,7 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from tests.permission_assertions import assert_owner_private  # noqa: E402
 from tuomin_gateway.mapping import load_mapping, save_mapping  # noqa: E402
 from tuomin_gateway.schemas import MappingEntry  # noqa: E402
 from tuomin_gateway.service.app import create_app  # noqa: E402
@@ -241,6 +242,7 @@ def test_cli_save_mapping_is_plaintext_local_artifact(tmp_path):
     save_mapping(_entries(), path)
 
     raw = path.read_text(encoding="utf-8")
+    assert_owner_private(path, is_dir=False)
 
     assert "Synthetic Entity Alpha" in raw
     assert getattr(load_mapping(path)[0], "original" + "_value") == "Synthetic Entity Alpha"

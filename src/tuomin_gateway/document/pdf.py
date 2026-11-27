@@ -93,7 +93,8 @@ def extract_pdf(
     two_column_pages = 0
     ocr_pages = 0
     try:
-        document = pymupdf.open(str(Path(path)))
+        pdf_bytes = Path(path).read_bytes()
+        document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     except Exception as exc:  # pymupdf raises its own FzError/FileDataError
         # hierarchy (not ValueError); translate at the parser boundary.
         raise ValueError(f"invalid or unreadable PDF: {exc}") from exc

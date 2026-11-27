@@ -1,0 +1,17 @@
+{
+  "_comment": "Synthetic-only macOS development registry. Copy to tuomin_apps.json; replace entries only with explicitly approved local dictionaries.",
+  "apps": {
+    "macos_contract_demo": {
+      "profile": "contract_review",
+      "dictionary": "tests/fixtures/synthetic_dictionary.json"
+    },
+    "macos_investment_demo": {
+      "scenario": "pre_investment",
+      "dictionary": "tests/fixtures/synthetic_dictionary.json"
+    },
+    "macos_kb_demo": {
+      "profile": "kb",
+      "dictionary": "tests/fixtures/synthetic_dictionary.json"
+    }
+  }
+}

@@ -72,3 +72,51 @@ def warm_ner_async() -> threading.Thread | None:
     worker = threading.Thread(target=load, name="tuomin-ner-warmup", daemon=True)
     worker.start()
     return worker
+
+
+def wait_for_parent_input_close() -> None:
+    """Wait for a supervising pipe without holding a Windows CRT stream lock.
+
+    In a frozen Windows process, a concurrent blocking sys.stdin.read() can
+    stall NumPy's native initialization. Poll the kernel pipe instead; normal
+    desktop launches do not call this opt-in supervision helper.
+    """
+    import sys
+
+    if os.name != "nt":
+        if sys.stdin is not None:
+            sys.stdin.read()
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetStdHandle.argtypes = [wintypes.DWORD]
+    kernel.GetStdHandle.restype = wintypes.HANDLE
+    kernel.PeekNamedPipe.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+                                   wintypes.LPVOID, ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID]
+    kernel.PeekNamedPipe.restype = wintypes.BOOL
+    kernel.ReadFile.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+                               ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID]
+    kernel.ReadFile.restype = wintypes.BOOL
+    handle = kernel.GetStdHandle(wintypes.DWORD(-10))
+    _wait_for_windows_pipe_close(kernel, handle)
+
+
+def _wait_for_windows_pipe_close(kernel, handle) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    available = wintypes.DWORD()
+    while True:
+        if not kernel.PeekNamedPipe(handle, None, 0, None, ctypes.byref(available), None):
+            # Broken/missing pipe means the supervisor is gone. Console input
+            # is intentionally unsupported for this explicitly managed mode.
+            return
+        if available.value:
+            buffer = ctypes.create_string_buffer(min(available.value, 4096))
+            read = wintypes.DWORD()
+            if not kernel.ReadFile(handle, buffer, len(buffer), ctypes.byref(read), None):
+                return
+        else:
+            time.sleep(0.1)

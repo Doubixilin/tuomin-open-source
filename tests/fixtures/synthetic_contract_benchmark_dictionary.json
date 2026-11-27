@@ -1,0 +1,83 @@
+[
+  {
+    "entry_id": "synthetic-contract-org-01",
+    "canonical_value": "虚构远灯展陈工作室",
+    "aliases": [],
+    "label": "ORG",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-org-02",
+    "canonical_value": "虚构蓝砂模型工坊",
+    "aliases": [],
+    "label": "ORG",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-project-01",
+    "canonical_value": "合成雾庭灯箱校色实验",
+    "aliases": [],
+    "label": "PROJECT",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-address-01",
+    "canonical_value": "虚构市试样区零号路样板仓",
+    "aliases": [],
+    "label": "ADDRESS",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-contract_id-01",
+    "canonical_value": "MOCK-QUOTE-042",
+    "aliases": [],
+    "label": "CONTRACT_ID",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-contract_id-02",
+    "canonical_value": "MOCK-LAMP-042-A",
+    "aliases": [],
+    "label": "CONTRACT_ID",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-address-02",
+    "canonical_value": "虚构市星纸街零号样机楼",
+    "aliases": [],
+    "label": "ADDRESS",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-address-03",
+    "canonical_value": "合成园区蓝样收件台",
+    "aliases": [],
+    "label": "ADDRESS",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  },
+  {
+    "entry_id": "synthetic-contract-person-01",
+    "canonical_value": "鹿小样",
+    "aliases": [],
+    "label": "PERSON",
+    "risk_level": "high",
+    "status": "active",
+    "version": "synthetic-v1"
+  }
+]

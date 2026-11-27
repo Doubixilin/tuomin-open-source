@@ -71,6 +71,7 @@ def env(tmp_path, monkeypatch):
 def test_unlicensed_blocks_new_tasks(env):
     client, _ = env
     for path in ("/api/v1/redact", "/api/v1/documents/parse", "/redact",
+                 "/api/v1/documents/redact-docx", "/api/v1/documents/redact-office",
                  "/api/v1/namespaces", "/v1/chat/completions",
                  "/apps/demo/v1/chat/completions"):
         resp = client.post(path, json={})
@@ -82,12 +83,15 @@ def test_unlicensed_allows_recovery_and_management(env):
     client, _ = env
     # 恢复/管理面永不 403-license（下游业务错误如 400/404/422 均可接受）
     for path in ("/api/v1/refill", "/api/v1/documents/refill",
+                 "/api/v1/documents/refill-docx", "/api/v1/documents/refill-office",
                  "/api/v1/documents/unlock-mapping", "/session/sid-x/refill"):
         resp = client.post(path, json={})
         assert resp.status_code != 403, path
     assert client.get("/healthz").status_code == 200
     assert client.get("/api/v1/license/status").status_code == 200
-    assert client.get("/ui/").status_code == 200
+    ui = client.get("/ui/")
+    assert ui.status_code == 200
+    assert ui.headers["cache-control"] == "no-cache"
 
 
 def test_status_when_unlicensed(env):

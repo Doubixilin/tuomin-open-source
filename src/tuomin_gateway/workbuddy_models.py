@@ -18,6 +18,7 @@ by the CLI, the admin API, the WebUI, and tests. Gateway discovery lives in
 """
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -28,9 +29,12 @@ MODES = {
     "auto": ("{base}/apps/{app}/auto/v1/chat/completions", "{name}·脱敏·无感回填"),
 }
 
-# WorkBuddy models.json written by the GUI uses real booleans, but the schema
-# also accepts the string form; keep emitting the GUI-compatible string form.
+# WorkBuddy validates JSON types; strings such as "True" are not booleans.
 PLACEHOLDER_API_KEY = "EXAMPLE_ONLY_NO_SECRET"
+# Older desktop configurations also used this placeholder.
+_PLACEHOLDER_KEYS = (PLACEHOLDER_API_KEY, "sk-REPLACE-ME")
+BOOLEAN_FIELDS = ("supportsToolCall", "supportsImages", "supportsReasoning", "useCustomProtocol", "onlyReasoning")
+_BOOL_FIELDS = BOOLEAN_FIELDS
 
 
 def build_entries(app: str, base_url: str, api_key: str, modes: list[str]) -> list[dict]:
@@ -44,14 +48,101 @@ def build_entries(app: str, base_url: str, api_key: str, modes: list[str]) -> li
                 "vendor": "Custom",
                 "url": url_t.format(base=base_url.rstrip("/"), app=app),
                 "apiKey": api_key,
-                "supportsToolCall": "True",
-                "supportsImages": "False",
-                "supportsReasoning": "True",
-                "useCustomProtocol": "False",
-                "reasoning": "{'defaultEffort': 'high'}",
+                "supportsToolCall": True,
+                "supportsImages": False,
+                "supportsReasoning": True,
+                "useCustomProtocol": False,
+                "reasoning": {"defaultEffort": "high"},
             }
         )
     return entries
+
+
+def normalize_legacy_fields(entry: dict) -> dict:
+    """Convert legacy Tuomin field types without replacing keys or GUI choices."""
+    result = dict(entry)
+    for field in BOOLEAN_FIELDS:
+        value = result.get(field)
+        if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+            result[field] = value.strip().lower() == "true"
+    reasoning = result.get("reasoning")
+    if isinstance(reasoning, str):
+        # Older Tuomin versions wrote a Python dict literal, not a JSON object.
+        try:
+            parsed = ast.literal_eval(reasoning)
+        except (ValueError, SyntaxError):
+            parsed = None
+        if isinstance(parsed, dict) and all(isinstance(k, str) for k in parsed):
+            try:
+                json.dumps(parsed, allow_nan=False)
+            except (TypeError, ValueError):
+                pass
+            else:
+                result["reasoning"] = parsed
+    return result
+
+
+def entry_format_errors(entry: dict) -> list[str]:
+    """Check the documented field types; never include field values or keys."""
+    errors = []
+    if not isinstance(entry.get("id"), str) or not entry["id"].strip():
+        errors.append("id 必须是非空文本")
+    for field in BOOLEAN_FIELDS:
+        if field in entry and not isinstance(entry[field], bool):
+            errors.append(f"{field} 必须是布尔值 true/false")
+    if "reasoning" in entry and not isinstance(entry["reasoning"], dict):
+        errors.append("reasoning 必须是 JSON 对象")
+    for field in ("name", "vendor", "apiKey"):
+        if field in entry and not isinstance(entry[field], str):
+            errors.append(f"{field} 必须是文本")
+    return errors
+def _coerce_bool(value: object) -> object:
+    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+        return value.strip().lower() == "true"
+    return value
+
+
+def _coerce_reasoning(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        import ast
+        try:
+            parsed = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return value
+    return parsed if isinstance(parsed, dict) else value
+
+
+def normalize_entry(entry: dict) -> bool:
+    """Coerce legacy string-typed fields in place; True when anything changed."""
+    changed = False
+    for field_name in _BOOL_FIELDS:
+        if field_name in entry:
+            coerced = _coerce_bool(entry[field_name])
+            if coerced is not entry[field_name]:
+                entry[field_name] = coerced
+                changed = True
+    if "reasoning" in entry:
+        coerced = _coerce_reasoning(entry["reasoning"])
+        if coerced is not entry["reasoning"]:
+            entry["reasoning"] = coerced
+            changed = True
+    return changed
+
+
+def invalid_entries(existing: list) -> list[dict]:
+    """Entries WorkBuddy would drop: string-typed booleans or a non-object ``reasoning``."""
+    bad = []
+    for entry in existing:
+        if not isinstance(entry, dict):
+            continue
+        if any(isinstance(entry.get(f), str) for f in _BOOL_FIELDS) or isinstance(entry.get("reasoning"), str):
+            bad.append(entry)
+    return bad
 
 
 def mode_from_url(url: object, app: str) -> str | None:
@@ -98,6 +189,9 @@ def merge_entries(existing: list, new_entries: list[dict], *, app: str | None = 
     duplicate. Without ``app``, the original by-id upsert behavior is preserved.
     """
     result = [dict(entry) for entry in existing if isinstance(entry, dict)]
+    if app:
+        result = [normalize_legacy_fields(entry) if mode_from_url(entry.get("url"), app)
+                  else entry for entry in result]
     by_id = {entry.get("id"): entry for entry in result}
     by_mode: dict[str, dict] = {}
     if app:
@@ -115,13 +209,13 @@ def merge_entries(existing: list, new_entries: list[dict], *, app: str | None = 
             # adopt other fields when a real (non-placeholder) key is supplied.
             target["url"] = entry["url"]
             new_key = entry.get("apiKey")
-            if new_key and new_key != PLACEHOLDER_API_KEY:
+            if new_key and new_key not in _PLACEHOLDER_KEYS:
                 target["apiKey"] = new_key
             continue
         if entry["id"] in by_id:
             current = by_id[entry["id"]]
             new_key = entry.get("apiKey")
-            if (not new_key or new_key == PLACEHOLDER_API_KEY) and current.get("apiKey"):
+            if (not new_key or new_key in _PLACEHOLDER_KEYS) and current.get("apiKey"):
                 entry = {**entry, "apiKey": current["apiKey"]}
             current.update(entry)
         else:
@@ -132,6 +226,24 @@ def merge_entries(existing: list, new_entries: list[dict], *, app: str | None = 
                 if mode:
                     by_mode[mode] = entry
     return result
+
+
+def prune_app_entries(existing: list, apps) -> tuple[list, list[dict]]:
+    """Drop entries that point at any of ``apps`` (project endpoints only).
+
+    Used for apps the gateway cannot forward upstream: such entries can never
+    work (every chat is answered 502) and would otherwise reappear in the
+    picker once their legacy field types are healed."""
+    targets = [a for a in (apps or []) if a]
+    if not targets:
+        return list(existing), []
+    kept, removed = [], []
+    for entry in existing:
+        if isinstance(entry, dict) and any(mode_from_url(entry.get("url"), app) for app in targets):
+            removed.append(entry)
+        else:
+            kept.append(entry)
+    return kept, removed
 
 
 def load_models(path: Path | str) -> list:

@@ -201,6 +201,7 @@ _BLOCKED_PATH_PREFIXES = (
     # 文件工作台（新建任务）
     "/api/v1/documents/parse",
     "/api/v1/documents/redact-docx",
+    "/api/v1/documents/redact-office",
     # 会话与命名空间（新建/追加脱敏）
     "/session/open",
     "/api/v1/namespaces",

@@ -36,6 +36,21 @@ class ParagraphText:
     index: int
     text: str
     nodes: tuple[TextNodeRef, ...]
+    # Table cell paragraphs only: header text of the column (first row), used
+    # as a rule clue for bare values such as an account number.
+    context: tuple[str, ...] = ()
+
+
+_DOCX_ERROR_MESSAGES = {
+    "not_a_package": "不是有效的 Word 文档",
+    "encrypted_package": "文件设置了打开密码，请先去掉密码",
+    "digital_signature": "文件带数字签名，改写会使签名失效，请先移除签名",
+    "smartart_present": "文件含 SmartArt，暂不支持原格式脱敏，请先转为文本或图片",
+    "ole_object_present": "文件含 OLE 嵌入对象（如 WPS 公式），可选择「移除嵌入对象后继续」",
+    "tracked_changes": "文件含修订记录",
+    "comments_present": "文件含批注",
+    "notes_present": "文件含脚注或尾注",
+}
 
 
 class DocxUnsupportedError(ValueError):
@@ -43,7 +58,13 @@ class DocxUnsupportedError(ValueError):
 
     def __init__(self, code: str, message: str | None = None) -> None:
         self.code = code
-        super().__init__(message or code)
+        text = message or _DOCX_ERROR_MESSAGES.get(code)
+        super().__init__(f"{code}: {text}" if text else code)
+
+
+_TEXT_TAGS = ("t", "delText")  # deleted text of tracked changes is still text in the file
+_AUTHOR_ATTRIBUTES = ("author", "initials")
+_W15 = "http://schemas.microsoft.com/office/word/2012/wordml"
 
 
 def _open(data: bytes) -> zipfile.ZipFile:
@@ -56,7 +77,9 @@ def _open(data: bytes) -> zipfile.ZipFile:
 
 
 def _patchable_parts(names: list[str]) -> list[str]:
-    pattern = re.compile(r"word/(?:header|footer)\d*\.xml$")
+    # Body, headers/footers, plus comments, footnotes and endnotes: all are
+    # ordinary w:p paragraphs and all can carry sensitive text.
+    pattern = re.compile(r"word/(?:header|footer)\d*\.xml$|word/(?:comments|footnotes|endnotes)\.xml$")
     return [name for name in names if name == "word/document.xml" or pattern.fullmatch(name)]
 
 
@@ -67,8 +90,26 @@ def _parse(raw: bytes, part: str) -> ET.Element:
         raise ValueError(f"Invalid XML part: {part}") from exc
 
 
+def _text_tags() -> tuple[str, ...]:
+    return tuple(_qn(tag) for tag in _TEXT_TAGS)
+
+
 def _has_nonempty_text(root: ET.Element) -> bool:
-    return any((node.text or "").strip() for node in root.iter(_qn("t")))
+    tags = _text_tags()
+    return any((node.text or "").strip() for node in root.iter() if node.tag in tags)
+
+
+def _anonymize_authors(root: ET.Element) -> int:
+    """Replace comment / revision author names irreversibly; returns the count."""
+    count = 0
+    for node in root.iter():
+        for attribute in _AUTHOR_ATTRIBUTES:
+            for namespace in (_W, _W15):
+                key = f"{{{namespace}}}{attribute}"
+                if node.get(key):
+                    node.set(key, "匿名" if attribute == "author" else "")
+                    count += 1
+    return count
 
 
 def _own_text_nodes(paragraph: ET.Element) -> list[ET.Element]:
@@ -84,12 +125,13 @@ def _own_text_nodes(paragraph: ET.Element) -> list[ET.Element]:
     are enumerated as their own paragraphs and patched there.
     """
     nodes: list[ET.Element] = []
+    tags = _text_tags()
 
     def walk(element: ET.Element) -> None:
         for child in list(element):
             if child.tag == _qn("txbxContent"):
                 continue
-            if child.tag == _qn("t"):
+            if child.tag in tags:
                 nodes.append(child)
                 continue
             walk(child)
@@ -133,23 +175,16 @@ def probe_docx(data: bytes, allow_ole_strip: bool = False) -> list[dict[str, str
         for part in _patchable_parts(names):
             roots.append((part, _parse(package.read(part), part)))
         document = next(root for part, root in roots if part == "word/document.xml")
-        if any(document.find(f".//{_qn(kind)}") is not None for kind in ("ins", "del")):
-            raise DocxUnsupportedError("tracked_changes")
-
-        if "word/comments.xml" in name_set:
-            comments = _parse(package.read("word/comments.xml"), "word/comments.xml")
-            if _has_nonempty_text(comments):
-                raise DocxUnsupportedError("comments_present")
-        for part in ("word/footnotes.xml", "word/endnotes.xml"):
-            if part in name_set and _notes_have_text(_parse(package.read(part), part)):
-                raise DocxUnsupportedError("notes_present")
-
         all_roots = list(roots)
-        for part in ("word/comments.xml", "word/footnotes.xml", "word/endnotes.xml"):
-            if part in name_set:
-                all_roots.append((part, _parse(package.read(part), part)))
-
         warnings: list[dict[str, str]] = []
+        if any(root.find(f".//{_qn(kind)}") is not None for _, root in roots for kind in ("ins", "del", "moveFrom", "moveTo")):
+            warnings.append({"code": "tracked_changes_patched", "message": "修订记录里插入和删除的文字已一并脱敏与回填；接受或拒绝修订后内容保持一致"})
+        if "word/comments.xml" in name_set and any(_has_nonempty_text(root) for part, root in roots if part == "word/comments.xml"):
+            warnings.append({"code": "comments_patched", "message": "批注正文已纳入脱敏与回填范围"})
+        if any(part in {"word/footnotes.xml", "word/endnotes.xml"} and _notes_have_text(root) for part, root in roots):
+            warnings.append({"code": "notes_patched", "message": "脚注和尾注已纳入脱敏与回填范围"})
+        if any(node.get(_qn("author")) or node.get(f"{{{_W15}}}author") for _, root in roots for node in root.iter()) or "word/people.xml" in name_set:
+            warnings.append({"code": "authors_anonymized", "message": "批注与修订的作者名会改为「匿名」，回填不会恢复作者名"})
         # Text boxes: their paragraphs are ordinary nested w:p and ARE covered
         # by extraction/patching (engine test proves it), so text-bearing boxes
         # are patched with a warning instead of being blocked. Empty shape-only
@@ -236,8 +271,43 @@ def _clean_content_types_for_ole_strip(raw: bytes) -> bytes | None:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
+def _table_headers(root: ET.Element) -> dict[int, tuple[str, ...]]:
+    """id(paragraph) → its column's header (same column in the table's first row).
+
+    Columns are counted with gridSpan so merged cells keep alignment; nested
+    tables are visited later and override their outer table's header.
+    """
+    def columns(row: ET.Element):
+        column = 0
+        for cell in row:
+            if cell.tag != _qn("tc"):
+                continue
+            yield column, cell
+            span = cell.find(f"{_qn('tcPr')}/{_qn('gridSpan')}")
+            try:
+                column += max(1, int(span.get(_qn("val"), "1"))) if span is not None else 1
+            except ValueError:
+                column += 1
+
+    result: dict[int, tuple[str, ...]] = {}
+    for table in root.iter(_qn("tbl")):
+        rows = [child for child in table if child.tag == _qn("tr")]
+        if len(rows) < 2:
+            continue
+        headers = {column: "".join(node.text or "" for node in cell.iter(_qn("t"))).strip() for column, cell in columns(rows[0])}
+        for row in rows[1:]:
+            for column, cell in columns(row):
+                header = headers.get(column, "")
+                if not header or any(ch.isdigit() for ch in header):
+                    continue
+                for paragraph in cell.iter(_qn("p")):
+                    result[id(paragraph)] = (header,)
+    return result
+
+
 def _paragraphs_from_root(part: str, root: ET.Element) -> list[ParagraphText]:
     result: list[ParagraphText] = []
+    headers = _table_headers(root)
     for paragraph_index, paragraph in enumerate(root.iter(_qn("p"))):
         refs: list[TextNodeRef] = []
         pieces: list[str] = []
@@ -247,7 +317,7 @@ def _paragraphs_from_root(part: str, root: ET.Element) -> list[ParagraphText]:
             refs.append(TextNodeRef(part, paragraph_index, node_index, offset, text))
             pieces.append(text)
             offset += len(text)
-        result.append(ParagraphText(part, paragraph_index, "".join(pieces), tuple(refs)))
+        result.append(ParagraphText(part, paragraph_index, "".join(pieces), tuple(refs), headers.get(id(paragraph), ())))
     return result
 
 
@@ -408,6 +478,18 @@ def redact_docx(data: bytes, replacements: list[dict], allow_ole_strip: bool = F
                 if cleaned_ct is not None:
                     changed["[Content_Types].xml"] = cleaned_ct
 
+        # Comment / revision authors are personal data outside any text node:
+        # anonymize them in every part that carries them (irreversible, warned).
+        names = package.namelist()
+        for part in [*valid_parts, *(n for n in names if n == "word/people.xml")]:
+            if part not in roots:
+                raw = package.read(part)
+                root = _parse(raw, part)
+                if _anonymize_authors(root):
+                    roots[part] = (root, raw)
+            else:
+                _anonymize_authors(roots[part][0])
+
         for part, (root, raw) in roots.items():
             changed[part] = _serialize(root, raw)
         rebuilt, hashes = _rebuild(package, changed, drop)
@@ -450,7 +532,9 @@ def refill_docx(data: bytes, values: dict[str, str]) -> dict:
         restored_count = 0
         for part, (root, raw) in roots.items():
             part_changed = False
-            for node in root.iter(_qn("t")):
+            for node in root.iter():
+                if node.tag not in _text_tags():
+                    continue
                 text = node.text or ""
                 if replacement_re is None:
                     continue

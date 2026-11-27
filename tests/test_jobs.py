@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import os
-import stat
 import threading
 
 import pytest
 
+from tests.permission_assertions import assert_owner_private
 from tuomin_gateway.jobs import JobFieldError, JobStore
 
 _HASH_A = "a" * 64
@@ -136,8 +135,8 @@ def test_red_line_fields_are_rejected(tmp_path) -> None:
 def test_owner_only_permissions(tmp_path) -> None:
     directory = tmp_path / "private-jobs"
     store = JobStore(directory)
-    assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700
-    assert stat.S_IMODE(os.stat(directory / "jobs.db").st_mode) == 0o600
+    assert_owner_private(directory, is_dir=True)
+    assert_owner_private(directory / "jobs.db", is_dir=False)
     store.close()
 
 

@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 import threading
 import time
 from pathlib import Path
@@ -17,7 +18,7 @@ from pathlib import Path
 from tuomin_gateway.platform_security import restrict_permissions
 
 JOB_STATUS = frozenset({"active", "completed", "failed"})
-ENTRY_KINDS = frozenset({"workbench", "api", "proxy", "cli"})
+ENTRY_KINDS = frozenset({"workbench", "api", "proxy", "cli", "clipboard", "agent"})
 _FORBIDDEN_KEYS = frozenset(
     {
         "text",
@@ -115,6 +116,28 @@ def _json_dump(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _open_db_file(path: Path) -> int:
+    """os.open with a short retry for transient Windows AV locks.
+
+    Antivirus scanners briefly hold freshly written/closed SQLite files; the
+    opening create then fails with WinError 32/EACCES even though nothing in
+    this process keeps the handle. POSIX is unaffected (unlink/rename on open
+    files is legal there), so the retry only runs on Windows.
+    """
+    if sys.platform != "win32":
+        return os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    last_error: OSError | None = None
+    for delay_ms in (0, 50, 100, 200, 400):
+        if delay_ms:
+            time.sleep(delay_ms / 1000)
+        try:
+            return os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+        except PermissionError as exc:
+            last_error = exc
+    assert last_error is not None
+    raise last_error
+
+
 class JobStore:
     """Owner-only SQLite job directory and value-free call ledger."""
 
@@ -123,7 +146,7 @@ class JobStore:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         restrict_permissions(self.directory, is_dir=True)
         self.path = self.directory / "jobs.db"
-        fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
+        fd = _open_db_file(self.path)
         os.close(fd)
         restrict_permissions(self.path, is_dir=False)
         self._lock = threading.Lock()

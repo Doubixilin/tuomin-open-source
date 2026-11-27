@@ -1,0 +1,104 @@
+{
+  "schema_version": "synthetic-contract.v1",
+  "source": "synthetic",
+  "description": "为脱敏回归手工编写的虚构灯箱制作合同。单位、地点、联系人、号码与编号均为测试设定。",
+  "cases": [
+    {
+      "id": "synthetic-contract-scope",
+      "section": "工作范围",
+      "kind": "synthetic_contract",
+      "text": "虚构远灯展陈工作室委托虚构蓝砂模型工坊在虚构市试样区零号路样板仓承担合成雾庭灯箱校色实验。合同编号为MOCK-LAMP-042-A，对应询价单MOCK-QUOTE-042。制作两套灯箱样件，先做纸板打样，再进行色温检查。双方采用书面验收，每批交付附一份操作卡，最后一批需带备件清单。",
+      "sensitive_references": [
+        {
+          "label": "ORG",
+          "value": "虚构远灯展陈工作室"
+        },
+        {
+          "label": "ORG",
+          "value": "虚构蓝砂模型工坊"
+        },
+        {
+          "label": "PROJECT",
+          "value": "合成雾庭灯箱校色实验"
+        },
+        {
+          "label": "ADDRESS",
+          "value": "虚构市试样区零号路样板仓"
+        },
+        {
+          "label": "CONTRACT_ID",
+          "value": "MOCK-QUOTE-042"
+        },
+        {
+          "label": "CONTRACT_ID",
+          "value": "MOCK-LAMP-042-A"
+        }
+      ],
+      "utility_references": [
+        "制作两套灯箱样件",
+        "纸板打样",
+        "色温检查",
+        "书面验收",
+        "操作卡",
+        "备件清单"
+      ]
+    },
+    {
+      "id": "synthetic-contract-notices",
+      "section": "通知与交接",
+      "kind": "synthetic_contract",
+      "text": "虚构远灯展陈工作室的书面通知寄往虚构市星纸街零号样机楼，总机010-00000001，样件登记专线0999-0000002。样件送至合成园区蓝样收件台。收件时核对箱号，拍摄封条并登记包装状态，随后签发回执，破损件须单独存放。",
+      "sensitive_references": [
+        {
+          "label": "ORG",
+          "value": "虚构远灯展陈工作室"
+        },
+        {
+          "label": "ADDRESS",
+          "value": "虚构市星纸街零号样机楼"
+        },
+        {
+          "label": "CONTACT",
+          "value": "010-00000001"
+        },
+        {
+          "label": "CONTACT",
+          "value": "0999-0000002"
+        },
+        {
+          "label": "ADDRESS",
+          "value": "合成园区蓝样收件台"
+        }
+      ],
+      "utility_references": [
+        "核对箱号",
+        "拍摄封条",
+        "登记包装状态",
+        "签发回执",
+        "破损件须单独存放"
+      ]
+    },
+    {
+      "id": "synthetic-contract-contact",
+      "section": "现场验收",
+      "kind": "synthetic_contract",
+      "text": "验收联络人为鹿小样，演示手机号13900000042。操作员先进行断电检查，再拍摄样件侧面，按照随箱清单逐件点验。交接人将问题记入复核单。",
+      "sensitive_references": [
+        {
+          "label": "PERSON",
+          "value": "鹿小样"
+        },
+        {
+          "label": "CONTACT",
+          "value": "13900000042"
+        }
+      ],
+      "utility_references": [
+        "断电检查",
+        "拍摄样件侧面",
+        "逐件点验",
+        "复核单"
+      ]
+    }
+  ]
+}

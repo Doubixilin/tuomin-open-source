@@ -3,412 +3,226 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tuomin 本地脱敏网关 · 控制台</title>
-<style>
-  /* ============ Tuomin Console · 深色科技风设计系统 ============ */
-  :root {
-    --fg:#e7ecf5; --muted:#98a2b8; --faint:#64708a;
-    --line:rgba(148,163,184,.16); --line2:rgba(148,163,184,.09);
-    --bg:#0a0e17; --bg-2:#0d1220; --card:#101624; --card-2:#0d1320;
-    --accent:#22d3ee; --accent-2:#818cf8; --accent-soft:rgba(34,211,238,.12);
-    --ok:#34d399; --ok-soft:rgba(52,211,153,.13);
-    --danger:#fb7185; --danger-soft:rgba(251,113,133,.12);
-    --warn:#fbbf24; --warn-soft:rgba(251,191,36,.13);
-    --role:#2dd4bf; --role-soft:rgba(45,212,191,.13);
-    --ph:#a5b4cf; --ph-soft:rgba(165,180,207,.13);
-    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,monospace;
-    --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 16px 40px -24px rgba(0,0,0,.7);
-    --glow:0 0 24px -6px rgba(34,211,238,.45);
-  }
-  * { box-sizing:border-box; }
-  html,body { margin:0; }
-  body {
-    font:14px/1.65 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif; color:var(--fg);
-    background:
-      radial-gradient(900px 420px at 85% -8%, rgba(34,211,238,.09) 0%, transparent 62%),
-      radial-gradient(700px 380px at -10% 12%, rgba(129,140,248,.07) 0%, transparent 58%),
-      var(--bg);
-    min-height:100vh;
-  }
-  body::before {
-    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
-    background-image:radial-gradient(rgba(148,163,184,.055) 1px, transparent 1px);
-    background-size:26px 26px;
-    mask-image:linear-gradient(180deg, rgba(0,0,0,.8), rgba(0,0,0,.25) 420px, transparent 720px);
-    -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.8), rgba(0,0,0,.25) 420px, transparent 720px);
-  }
-  ::selection { background:rgba(34,211,238,.28); }
-  ::-webkit-scrollbar { width:10px; height:10px; }
-  ::-webkit-scrollbar-thumb { background:#232c40; border-radius:6px; border:2px solid var(--bg); }
-  ::-webkit-scrollbar-thumb:hover { background:#2e3a56; }
-  ::-webkit-scrollbar-track { background:transparent; }
-  /* ---- header ---- */
-  header.hero {
-    background:
-      radial-gradient(600px 300px at 88% -40%, rgba(34,211,238,.16) 0%, transparent 60%),
-      linear-gradient(160deg, #0c1424 0%, #0a1120 55%, #0c1a26 100%);
-    color:#eef2fa; padding:22px 26px 20px;
-    border-bottom:1px solid rgba(34,211,238,.18);
-    position:relative; overflow:hidden;
-  }
-  header.hero::after {
-    content:""; position:absolute; inset:0; pointer-events:none;
-    background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
-    background-size:22px 22px;
-    mask-image:linear-gradient(120deg, transparent 55%, rgba(0,0,0,.6));
-    -webkit-mask-image:linear-gradient(120deg, transparent 55%, rgba(0,0,0,.6));
-  }
-  .hero .brand { display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
-  .hero .logo {
-    width:38px; height:38px; border-radius:11px;
-    background:linear-gradient(145deg, rgba(34,211,238,.22), rgba(129,140,248,.16));
-    display:grid; place-items:center; font-size:15px; font-weight:800; color:var(--accent);
-    box-shadow:inset 0 0 0 1px rgba(34,211,238,.35), var(--glow);
-    font-family:var(--mono); letter-spacing:.02em;
-  }
-  .hero h1 { font-size:17.5px; margin:0; font-weight:680; letter-spacing:.3px; }
-  .hero .sub { color:#93a0b8; font-size:12px; margin-top:2px; }
-  .trust { display:flex; gap:7px; flex-wrap:wrap; margin-top:14px; position:relative; z-index:1; }
-  .trust span, .trust a {
-    font-size:11.5px; color:#aeb9cf;
-    background:rgba(148,163,184,.07); border:1px solid rgba(148,163,184,.16);
-    padding:3px 10px; border-radius:20px; backdrop-filter:blur(4px);
-  }
-  .trust a { text-decoration:none; transition:.15s; }
-  .trust a:hover { color:#fff; border-color:rgba(34,211,238,.4); background:rgba(34,211,238,.09); }
-  .tokenbar { display:flex; align-items:center; gap:9px; margin-top:14px; flex-wrap:wrap; position:relative; z-index:1; }
-  .tokenbar label { color:#93a0b8; font-size:12px; }
-  .tokenbar input {
-    min-width:280px; padding:7px 11px; border-radius:9px;
-    border:1px solid rgba(148,163,184,.24);
-    background:rgba(10,14,23,.6); color:var(--fg); font:inherit;
-    transition:border-color .15s, box-shadow .15s;
-  }
-  .tokenbar input:focus { outline:none; border-color:rgba(34,211,238,.55); box-shadow:0 0 0 3px rgba(34,211,238,.14); }
-  .tokenbar input::placeholder { color:#5d6a84; }
-  .tokenbar .meta { color:#7d89a3; font-size:11.5px; }
-  /* ---- tabs ---- */
-  nav.tabs {
-    display:flex; gap:3px; padding:6px; margin:18px auto 0; max-width:1080px; width:calc(100% - 36px);
-    background:rgba(16,22,36,.88); border:1px solid var(--line); border-radius:14px;
-    box-shadow:var(--shadow); backdrop-filter:blur(14px);
-    position:sticky; top:12px; z-index:6;
-  }
-  nav.tabs button {
-    flex:1; background:none; border:none; border-radius:10px; color:var(--muted);
-    padding:9px 10px; cursor:pointer; font:inherit; font-weight:550; transition:.15s; white-space:nowrap;
-  }
-  nav.tabs button:hover { background:rgba(148,163,184,.08); color:var(--fg); }
-  nav.tabs button.active {
-    background:linear-gradient(180deg, rgba(34,211,238,.16), rgba(34,211,238,.09));
-    color:var(--accent);
-    box-shadow:inset 0 0 0 1px rgba(34,211,238,.32), 0 0 18px -8px rgba(34,211,238,.5);
-  }
-  main { max-width:1080px; margin:18px auto 48px; padding:0 18px; position:relative; z-index:1; }
-  section.tab { display:none; animation:fade .25s ease; }
-  section.tab.active { display:block; }
-  @keyframes fade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
-  @media (prefers-reduced-motion: reduce) { section.tab { animation:none; } * { transition:none !important; } }
-  /* ---- cards ---- */
-  .card {
-    background:linear-gradient(180deg, var(--card), var(--card-2));
-    border:1px solid var(--line); border-radius:15px; padding:19px 21px; margin-bottom:16px;
-    box-shadow:var(--shadow);
-  }
-  .card h2 { font-size:14.5px; margin:0 0 4px; font-weight:680; letter-spacing:.2px; display:flex; align-items:center; gap:8px; }
-  .card h2::before { content:""; width:3px; height:14px; border-radius:2px; background:linear-gradient(180deg,var(--accent),var(--accent-2)); box-shadow:var(--glow); }
-  .card .hint { color:var(--muted); font-size:12px; margin:0 0 14px; }
-  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  label { color:var(--muted); font-size:12px; }
-  code { font-family:var(--mono); font-size:12px; background:rgba(148,163,184,.1); border:1px solid var(--line2); border-radius:5px; padding:1px 5px; color:var(--accent); }
-  select, input, textarea {
-    padding:8px 11px; border:1px solid var(--line); border-radius:9px; font:inherit; color:var(--fg);
-    background:var(--bg-2); transition:border-color .15s, box-shadow .15s;
-  }
-  select:focus, input:focus, textarea:focus { outline:none; border-color:rgba(34,211,238,.55); box-shadow:0 0 0 3px rgba(34,211,238,.14); }
-  input::placeholder, textarea::placeholder { color:#5d6a84; }
-  input { min-width:150px; }
-  input[type="file"] { color:var(--muted); }
-  input[type="file"]::file-selector-button {
-    border:1px solid var(--line); border-radius:8px; background:rgba(148,163,184,.1); color:var(--fg);
-    padding:6px 12px; margin-right:10px; font:inherit; cursor:pointer; transition:.15s;
-  }
-  input[type="file"]::file-selector-button:hover { border-color:rgba(34,211,238,.4); background:rgba(34,211,238,.1); }
-  textarea { width:100%; min-height:104px; resize:vertical; line-height:1.75; }
-  .btn {
-    padding:8px 16px; border:1px solid transparent; border-radius:9px; cursor:pointer; font:inherit; font-weight:600;
-    background:linear-gradient(180deg, #26d6ef, #0eb8d4); color:#06222b; letter-spacing:.2px; transition:.15s;
-    box-shadow:0 0 0 1px rgba(34,211,238,.25), 0 8px 22px -12px rgba(34,211,238,.55);
-  }
-  .btn:hover { filter:brightness(1.08); box-shadow:0 0 0 1px rgba(34,211,238,.45), 0 10px 26px -10px rgba(34,211,238,.6); }
-  .btn:active { transform:translateY(1px); }
-  .btn:disabled { opacity:.45; cursor:not-allowed; filter:none; box-shadow:none; }
-  .btn.ghost { background:transparent; color:var(--accent); border-color:rgba(34,211,238,.35); box-shadow:none; }
-  .btn.ghost:hover { background:var(--accent-soft); border-color:rgba(34,211,238,.55); }
-  .btn.danger { background:transparent; color:var(--danger); border-color:rgba(251,113,133,.35); padding:5px 11px; font-size:12.5px; box-shadow:none; }
-  .btn.danger:hover { background:var(--danger-soft); }
-  .btn.sm { padding:6px 12px; font-size:12.5px; }
-  table { width:100%; border-collapse:collapse; margin-top:6px; }
-  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line2); font-size:13px; vertical-align:middle; }
-  th { color:var(--faint); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
-  tbody tr:hover { background:rgba(148,163,184,.05); }
-  .pills span { display:inline-block; background:rgba(148,163,184,.08); border:1px solid var(--line); border-radius:20px; padding:2px 10px; margin:2px 6px 2px 0; font-size:12px; }
-  .meta { color:var(--muted); font-size:12px; }
-  .empty { color:var(--faint); padding:16px 2px; }
-  a { color:var(--accent); text-decoration:none; }
-  a:hover { text-decoration:underline; }
-  :focus-visible { outline:2px solid rgba(34,211,238,.6); outline-offset:2px; }
-  #toast {
-    position:fixed; bottom:22px; right:22px; background:#141c2e; color:var(--fg);
-    border:1px solid rgba(34,211,238,.3); padding:11px 17px; border-radius:11px; opacity:0;
-    transform:translateY(8px); transition:.22s; box-shadow:0 20px 50px -20px rgba(0,0,0,.8), var(--glow); z-index:20;
-  }
-  #toast.show { opacity:1; transform:none; }
-  /* ---- 实时脱敏 ---- */
-  .controls { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-  .samples { display:flex; gap:6px; flex-wrap:wrap; }
-  .chip-btn {
-    background:rgba(129,140,248,.1); color:#aab5ff; border:1px solid rgba(129,140,248,.28);
-    border-radius:20px; padding:5px 13px; font-size:12.5px; cursor:pointer; font:inherit; font-weight:550; transition:.15s;
-  }
-  .chip-btn:hover { background:rgba(129,140,248,.18); border-color:rgba(129,140,248,.5); }
-  .ck { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:12.5px; cursor:pointer; user-select:none; }
-  .ck input { accent-color:var(--accent); min-width:0; }
-  .panes { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:6px; }
-  @media (max-width:760px){ .panes { grid-template-columns:1fr; } }
-  .pane { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--bg-2); }
-  .pane .ph { padding:8px 13px; font-size:12px; font-weight:600; border-bottom:1px solid var(--line2); display:flex; align-items:center; gap:7px; }
-  .pane.before .ph { background:rgba(148,163,184,.05); color:var(--muted); }
-  .pane.after .ph { background:linear-gradient(90deg, rgba(34,211,238,.1), transparent 65%); color:var(--accent); }
-  .pane .body { padding:13px 15px; white-space:pre-wrap; word-break:break-word; font-size:13.5px; line-height:1.9; min-height:84px; }
-  .dot { width:7px; height:7px; border-radius:50%; display:inline-block; box-shadow:0 0 8px currentColor; }
-  /* highlight tokens */
-  mark.sens { background:var(--danger-soft); color:var(--danger); border-radius:4px; padding:0 3px; text-decoration:line-through; text-decoration-color:rgba(251,113,133,.55); }
-  .tok { border-radius:5px; padding:1px 6px; font-weight:600; font-size:12.5px; font-family:var(--mono); white-space:nowrap; }
-  .tok.role { background:var(--role-soft); color:var(--role); box-shadow:inset 0 0 0 1px rgba(45,212,191,.35); }
-  .tok.cred { background:var(--danger-soft); color:var(--danger); box-shadow:inset 0 0 0 1px rgba(251,113,133,.35); }
-  .tok.ph   { background:var(--ph-soft); color:var(--ph); box-shadow:inset 0 0 0 1px rgba(165,180,207,.28); }
-  .tok.gen  { background:var(--warn-soft); color:var(--warn); box-shadow:inset 0 0 0 1px rgba(251,191,36,.32); font-family:inherit; }
-  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; color:var(--muted); font-size:12px; }
-  .legend b { font-weight:600; }
-  /* stat cards */
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
-  @media (max-width:620px){ .stats { grid-template-columns:repeat(2,1fr); } }
-  .stat { border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:linear-gradient(180deg, rgba(148,163,184,.05), transparent); }
-  .stat .n { font-size:26px; font-weight:700; line-height:1.1; font-family:var(--mono); font-variant-numeric:tabular-nums; }
-  .stat .l { color:var(--muted); font-size:12px; margin-top:4px; }
-  .stat.accent .n { color:var(--accent); text-shadow:0 0 18px rgba(34,211,238,.5); }
-  .stat.gen .n { color:var(--warn); }
-  .stat.block .n { color:var(--danger); }
-  .stat.ph .n { color:var(--ph); }
-  .blocked-note { margin-top:12px; padding:11px 14px; border-radius:10px; background:var(--danger-soft); color:var(--danger); font-size:12.5px; border:1px solid rgba(251,113,133,.3); }
-  .kv { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-  .kv .k { font-size:11.5px; background:rgba(148,163,184,.07); border:1px solid var(--line); border-radius:7px; padding:3px 9px; color:var(--muted); font-family:var(--mono); }
-  .kv .k b { color:var(--fg); font-weight:600; }
-</style>
+<meta name="color-scheme" content="light dark" />
+<title>Tuomin 本地脱敏工作台</title>
+<link rel="icon" type="image/svg+xml" href="./tuomin-logo.svg" />
 <link rel="stylesheet" href="./tuomin-theme.css" />
 </head>
-<body class="tm-page tm-console">
-<header class="hero">
-  <div class="tm-header-row">
-    <div class="brand tm-brand-lockup">
-      <div class="logo tm-brand-mark">T</div>
-      <div>
-        <h1>Tuomin 本地脱敏网关 · 控制台</h1>
-        <div class="sub">中立中央脱敏服务 · 一套引擎，多应用接入</div>
-      </div>
-    </div>
-    <nav class="tm-global-nav" aria-label="全局导航">
-      <a class="active" href="./">控制台</a>
-      <a href="./about.html">公开版说明</a>
-    </nav>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><img class="mark" src="./tuomin-logo.svg" alt="" width="36" height="36" /><div><b>Tuomin</b><span>本地脱敏工作台</span></div></div>
+  <nav class="tabs" id="tabs" aria-label="工作台导航">
+    <details class="tab-group" open><summary>工作台</summary>
+    <button data-tab="home" class="active"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg></span>开始</button>
+    <button data-tab="try"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span>文本脱敏</button>
+    <button data-tab="files"><span class="ico"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></span>文件脱敏</button>
+    <button data-tab="refill"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 10h11a5 5 0 0 1 0 10H9"/><path d="M8 6 4 10l4 4"/></svg></span>文件回填</button>
+    <button data-tab="answer"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></span>回答回填</button>
+    <button data-tab="preview"><span class="ico"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>核对与原值</button>
+    <button data-tab="records"><span class="ico"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></span>记录</button>
+    </details>
+    <details class="tab-group" open><summary>接入</summary>
+    <button data-tab="onboard"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 7V3M15 7V3"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/></svg></span>工具接入</button>
+    </details>
+    <details class="tab-group" open><summary>管理</summary>
+    <button data-tab="dict"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 8h6"/></svg></span>本地词典</button>
+    <button data-tab="apps"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>应用与档位</button>
+    <button data-tab="settings"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>设置</button>
+    </details>
+  </nav>
+  <div class="sidebar-foot">
+    <span id="modeBadge">正式模式</span>
+    <span id="clipboardSummary" hidden>剪贴板会话：未开始</span>
   </div>
-  <div class="trust">
-    <span>仅本机 127.0.0.1</span>
-    <span>词典与映射不出本机</span>
-    <span>加密映射原值永不进 UI</span>
-    <span>非零泄漏 · 数据最小化</span>
-    <span id="licenseCustomer" style="display:none"></span>
-  </div>
-  <div class="tokenbar">
-    <label>管理 Token</label>
-    <input id="adminToken" type="password" placeholder="粘贴管理令牌文件中的 Token" />
-    <button class="btn ghost sm" id="saveToken">保存</button>
-    <span id="tokenMeta" class="meta"></span>
-  </div>
-</header>
-
-<div id="licenseBanner" class="blocked-note" style="display:none;max-width:1080px;width:calc(100% - 36px);margin:18px auto 0"></div>
-
-<nav class="tabs" id="tabs">
-  <button data-tab="try" class="active">实时脱敏</button>
-  <button data-tab="files">文件脱敏</button>
-  <button data-tab="refill">回填还原</button>
-  <button data-tab="answer">回答回填</button>
-  <button data-tab="preview">可信预览</button>
-  <button data-tab="records">记录</button>
-  <button data-tab="dict">本地词典</button>
-  <button data-tab="apps">应用 / 档位</button>
-  <button data-tab="onboard">接入向导</button>
-  <button data-tab="settings">设置</button>
-  <button data-tab="license">授权</button>
-</nav>
+</aside>
 
 <main>
-  <!-- ===== 试一试（showcase） ===== -->
-  <section class="tab active" id="tab-try">
+<div id="demoBanner" class="demo-banner" hidden>演示模式 · 合成数据 · 独立临时存储 · 退出即清除 · <a href="/demo/samples/synthetic-contract.docx" download>合成合同 DOCX</a> · <a href="/demo/samples/synthetic-register.xlsx" download>合成台账 XLSX</a></div>
+
+  <!-- ===== 开始 ===== -->
+  <section class="tab active" id="tab-home">
+    <header class="page-head"><h1>开始</h1><p>敏感信息在本机换成占位符，再交给 AI；拿回回答后在本机还原。所有映射只保存在这台电脑上。</p></header>
+    <div class="home-grid">
+      <button class="action" data-go="try"><div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div><b>脱敏一段文字</b><span>粘贴文本，立刻看到脱敏前后对照，适合核对规则与词典。</span></button>
+      <button class="action" data-go="files"><div class="ico"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></div><b>脱敏一个文件</b><span>Word、Excel、PPT、PDF、文本。原文件不改动，生成脱敏版和恢复包。</span></button>
+      <button class="action" data-go="answer"><div class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></div><b>还原 AI 回答</b><span>把带占位符的回答粘进来，用恢复包在本机换回原文。</span></button>
+    </div>
     <div class="card">
-      <h2>实时脱敏预览</h2>
-      <p class="hint">粘贴一段（合成）文本，看脱敏前后对照。预览走 <code>/redact_snippet</code>，<b>不落盘、不回填</b>。角色化与泛化需勾选「本地 NER」。</p>
+      <h2>最快的用法：托盘／菜单栏 + 剪贴板</h2>
+      <ol class="steps">
+        <li>在任何应用里复制一段文字，按 <span class="kbd" id="homeRedactKey">⌥⌘D</span> 或点菜单栏「脱敏剪贴板」。</li>
+        <li>粘贴到任意 AI 对话框提问。</li>
+        <li>复制 AI 的回答，按 <span class="kbd" id="homeRefillKey">⌥⌘R</span> 或点「回填剪贴板」，再粘到文档里。</li>
+      </ol>
+      <p class="hint" style="margin-top:12px">同一会话里多次复制使用同一套占位符。想让本单位的名称也被识别，去「本地词典」批量导入；想在 Claude Code、Codex 等工具里直接脱敏，去「工具接入」一键配置。Windows 可从托盘选择文件脱敏；Mac 可把文件拖到 Dock 或菜单栏图标上。</p>
+    </div>
+    <div class="trust-line"><span>只在本机 127.0.0.1 运行</span><span>词典与映射不出本机</span><span>原值只在你解锁时显示</span><span>不承诺零泄漏，请核对后使用</span></div>
+  </section>
+
+  <!-- ===== 文本脱敏 ===== -->
+  <section class="tab" id="tab-try">
+    <header class="page-head"><h1>文本脱敏</h1><p>粘贴一段文字，看脱敏前后的对照。这里只预览，不保存映射，也不能回填；需要回填请用剪贴板或文件脱敏。</p></header>
+    <div class="card">
       <div class="controls">
         <div class="samples" id="samples">
-          <button class="chip-btn" data-sample="contract">载入·合同片段</button>
-          <button class="chip-btn" data-sample="invest">载入·投前项目</button>
-          <button class="chip-btn" data-sample="general">载入·通用 PII</button>
-          <button class="chip-btn" data-sample="litigation">载入·诉讼文书</button>
+          <span class="meta">示例：</span>
+          <button class="chip-btn" data-sample="contract">合同片段</button>
+          <button class="chip-btn" data-sample="invest">投资项目</button>
+          <button class="chip-btn" data-sample="general">个人信息</button>
+          <button class="chip-btn" data-sample="litigation">诉讼文书</button>
         </div>
         <span style="flex:1"></span>
-        <label>场景 / 档位</label><select id="t_profile"></select>
+        <label>档位</label><select id="t_profile"></select>
+        <label class="ck" title="显示服务端全部场景、档位与敏感级"><input type="checkbox" id="t_adv" /> 全部档位</label>
         <label class="ck"><input type="checkbox" id="t_ner" checked /> 本地 NER</label>
-        <button class="btn" id="t_run">▶ 脱敏</button>
+        <button class="btn" id="t_run">脱敏</button>
       </div>
-      <textarea id="t_text" placeholder="例如：本协议由甲方……与乙方……签订，合同金额人民币 850 万元，工程地点位于浙江省杭州市……"></textarea>
-
+      <textarea id="t_text" placeholder="粘贴要脱敏的文字……"></textarea>
       <div class="panes">
         <div class="pane before">
-          <div class="ph"><span class="dot" style="background:var(--danger)"></span> 原文（红色＝敏感信息）</div>
+          <div class="ph"><span class="dot" style="background:var(--danger)"></span> 原文（标红为识别出的敏感信息）</div>
           <div class="body" id="t_before"><span class="empty">脱敏后这里显示原文，敏感处标红。</span></div>
         </div>
         <div class="pane after">
-          <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后（发往大模型的内容）</div>
-          <div class="body" id="t_after"><span class="empty">这里显示会真正发送到云端的内容。</span></div>
+          <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后（可以发给 AI 的内容）</div>
+          <div class="body" id="t_after"><span class="empty">这里显示真正会发出去的内容。</span></div>
         </div>
       </div>
       <div class="legend" id="t_legend" style="display:none"></div>
-
       <div class="stats" id="t_stats" style="display:none">
-        <div class="stat accent"><div class="n" id="s_detect">0</div><div class="l">检出敏感项</div></div>
-        <div class="stat ph"><div class="n" id="s_ph">0</div><div class="l">占位替换</div></div>
+        <div class="stat accent"><div class="n" id="s_detect">0</div><div class="l">识别出的敏感项</div></div>
+        <div class="stat ph"><div class="n" id="s_ph">0</div><div class="l">替换为占位符</div></div>
         <div class="stat gen"><div class="n" id="s_gen">0</div><div class="l">不可逆泛化</div></div>
-        <div class="stat block"><div class="n" id="s_block">0</div><div class="l">硬拦截标签</div></div>
+        <div class="stat block"><div class="n" id="s_block">0</div><div class="l">禁止外发</div></div>
       </div>
       <div id="t_extra"></div>
     </div>
   </section>
 
-  <!-- ===== 文件脱敏（workbench） ===== -->
+  <!-- ===== 文件脱敏 ===== -->
   <section class="tab" id="tab-files">
+    <header class="page-head"><h1>文件脱敏</h1><p>支持 txt、md、csv、json、yaml、docx、doc、xlsx、xlsm、xls、pptx。原文件不会被修改。Word、Excel、PPT 可以直接导出保留排版的脱敏文件。</p></header>
     <div class="card">
-      <h2>文件脱敏</h2>
-      <p class="hint">导入文件（txt / md / csv / json / yaml / docx / doc / xlsx / xlsm / xls），解析为 Markdown 后全量可逆脱敏。原文件不会被修改；产物只生成新文件。</p>
-      <div class="row" style="margin-bottom:10px">
-        <label>绑定应用（生产词典）</label>
-        <select id="f_app"><option value="">不绑定（仅本地预览，禁止出站）</option></select>
-        <span id="f_app_notice" class="hint" role="status"></span>
+      <h2>1. 选择文件</h2>
+      <div class="row">
+        <input type="file" id="f_file" accept=".txt,.md,.csv,.json,.yaml,.yml,.docx,.doc,.xlsx,.xlsm,.xls,.pptx" />
+        <label>使用词典</label>
+        <select id="f_app"><option value="">不使用词典（仅本地预览，禁止外发）</option></select>
+        <span id="f_app_notice" class="hint" role="status" style="margin:0"></span>
       </div>
       <div class="row">
-        <input type="file" id="f_file" accept=".txt,.md,.csv,.json,.yaml,.yml,.docx,.doc,.xlsx,.xlsm,.xls" />
-        <button class="btn" id="f_run">▶ 解析并脱敏</button>
-        <button class="btn ghost" id="f_run_docx" style="display:none">▶ 原格式脱敏（DOCX）</button>
+        <button class="btn" id="f_run">解析并脱敏</button>
+        <button class="btn ghost" id="f_run_docx" style="display:none">导出原格式脱敏文件</button>
+        <button class="btn danger" id="f_cancel" hidden>终止</button>
+        <span class="meta" id="f_progress"></span>
       </div>
+      <p class="hint" style="margin-top:12px">图片中的文字不会识别；遇到嵌入对象、宏等无法处理的内容会阻止导出。请核对提示后再使用结果。</p>
       <div id="f_egress"></div>
       <div id="f_meta"></div>
       <div id="f_warn"></div>
       <div class="pane after" style="margin-top:12px">
-        <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后的 Markdown</div>
-        <div class="body" id="f_out"><span class="empty">这里显示脱敏后的 Markdown 文本。</span></div>
+        <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏后的文本</div>
+        <div class="body" id="f_out"><span class="empty">脱敏后在这里预览。</span></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn ghost sm" id="f_dl_md" disabled>下载脱敏 MD</button>
-        <button class="btn ghost sm" id="f_dl_manifest" disabled>下载占位符清单</button>
+        <button class="btn" id="f_dl_office" disabled hidden>保存脱敏文件…</button>
+        <button class="btn" id="f_dl_md" disabled>保存脱敏文本…</button>
+        <button class="btn ghost sm" id="f_dl_manifest" disabled>保存占位符清单…</button>
+        <button class="btn ghost sm" id="f_learn" hidden>把识别出的名称加入词典…</button>
       </div>
     </div>
     <div class="card">
-      <h2>导出恢复包（.tuominmap）</h2>
-      <p class="hint">恢复包含原值（口令加密），等同于敏感数据，请妥善保管。回填时必须使用与任务匹配的恢复包。</p>
+      <h2>备份恢复包（可选）</h2>
+      <p class="hint">回填不需要它：映射已经保存在本机，在「文件回填」里选任务即可。只有要换一台电脑还原，或想长期归档时才需要导出。恢复包含原值，用口令加密，不要发给任何人。</p>
       <div class="row">
-        <input id="f_pass" type="password" placeholder="恢复包口令（不保存）" />
+        <input id="f_pass" type="password" placeholder="设置恢复包口令（不保存）" />
         <button class="btn sm" id="f_pkg" disabled>导出恢复包</button>
       </div>
     </div>
   </section>
 
-  <!-- ===== 回填还原 ===== -->
+  <!-- ===== 文件回填 ===== -->
   <section class="tab" id="tab-refill">
+    <header class="page-head"><h1>文件回填</h1><p>选对脱敏时的任务，再给出脱敏后的文件，就能在本机换回原文。被改过的文件会先让你核对差异。</p></header>
     <div class="card">
-      <h2>回填还原</h2>
-      <p class="hint">上传脱敏后的 Markdown 与对应的恢复包（.tuominmap）。未编辑的文件走严格校验；编辑过的文件会先列出占位符差异，确认后才回填。</p>
+      <h2>1. 选择脱敏时的任务</h2>
+      <div class="row"><label>任务</label><select id="r_task" style="min-width:320px"></select><button class="btn ghost sm" id="r_task_refresh">刷新</button></div>
+      <p class="hint" style="margin-top:8px">默认是最近一次脱敏。映射保存在本机，不需要恢复包和口令。</p>
+      <details class="advanced"><summary>改用恢复包文件（换机或从备份恢复时）</summary>
+        <div class="row" style="margin-top:10px"><label>恢复包</label><input type="file" id="r_pkg" accept=".tuominmap,.json" /><input id="r_pass" type="password" placeholder="恢复包口令" /></div>
+      </details>
+    </div>
+    <div class="card">
+      <h2>2. 选择脱敏后的文件并回填</h2>
       <div class="row">
-        <label>脱敏 MD</label><input type="file" id="r_md" accept=".md,.txt" />
-        <label>恢复包</label><input type="file" id="r_pkg" accept=".tuominmap,.json" />
+        <label>脱敏文本</label><input type="file" id="r_md" accept=".md,.txt" />
+        <button class="btn" id="r_run">校验并回填</button>
       </div>
-      <div class="row" style="margin-top:10px">
-        <label>或脱敏 DOCX</label><input type="file" id="r_docx" accept=".docx" />
-        <button class="btn sm" id="r_docx_run">▶ 原格式回填 DOCX</button>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <input id="r_pass" type="password" placeholder="恢复包口令" />
-        <button class="btn" id="r_run">▶ 校验并回填</button>
+      <h3>或：原格式文件（Word / Excel / PPT）</h3>
+      <div class="row">
+        <input type="file" id="r_docx" accept=".docx,.xlsx,.pptx" />
+        <button class="btn" id="r_docx_run">原格式回填</button>
       </div>
       <div id="r_diff"></div>
       <div class="row" id="r_confirm_row" style="display:none;margin-top:10px">
-        <label class="ck"><input type="checkbox" id="r_confirm" /> 我已核对上述占位符差异，确认回填</label>
+        <label class="ck"><input type="checkbox" id="r_confirm" /> 我已核对上述差异，确认回填</label>
         <button class="btn sm" id="r_confirm_btn">确认回填</button>
       </div>
       <div class="pane before" style="margin-top:12px">
-        <div class="ph"><span class="dot" style="background:var(--ok)"></span> 还原后的 Markdown</div>
-        <div class="body" id="r_out"><span class="empty">这里显示还原后的文本。</span></div>
+        <div class="ph"><span class="dot" style="background:var(--ok)"></span> 还原后的文本</div>
+        <div class="body" id="r_out"><span class="empty">还原后在这里预览。</span></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn ghost sm" id="r_dl" disabled>下载还原 MD</button>
+        <button class="btn" id="r_dl_office" disabled hidden>保存还原文件…</button>
+        <button class="btn" id="r_dl" disabled>保存还原文本…</button>
       </div>
     </div>
   </section>
 
-  <!-- ===== AI 回答回填 ===== -->
+  <!-- ===== 回答回填 ===== -->
   <section class="tab" id="tab-answer">
+    <header class="page-head"><h1>回答回填</h1><p>把 AI 返回的带占位符回答粘进来，选对应的任务，在本机换回原文。AI 只引用部分占位符或重复引用都正常；未知或被改写的占位符会被拦住。</p></header>
     <div class="card">
-      <h2>AI 回答回填</h2>
-      <p class="hint">把在线 AI 返回的带占位符回答粘贴或导入，选择对应恢复包并输入口令后在本机回填。AI 只引用部分占位符、重复引用均属正常；未知或损坏的占位符会被阻断。结果不会自动发回在线 AI，也不会覆盖导入文件。</p>
       <div class="row">
-        <label>导入 TXT/MD（可选）</label><input type="file" id="an_file" accept=".md,.txt" />
+        <textarea id="an_text" rows="8" style="width:100%" placeholder="粘贴 AI 的回答（含 &lt;ORG_001&gt; 这样的占位符）……"></textarea>
       </div>
-      <div class="row" style="margin-top:10px">
-        <textarea id="an_text" rows="8" style="width:100%" placeholder="粘贴 AI 的回答（含 &lt;ORG_001&gt; 等占位符）…"></textarea>
+      <div class="row">
+        <label>或导入文件</label><input type="file" id="an_file" accept=".md,.txt" />
       </div>
-      <div class="row" style="margin-top:10px">
-        <label>恢复包</label><input type="file" id="an_pkg" accept=".tuominmap,.json" />
-        <input id="an_pass" type="password" placeholder="恢复包口令（不保存）" />
-        <button class="btn" id="an_run">▶ 本地回填</button>
+      <div class="row">
+        <label>对应任务</label><select id="an_task" style="min-width:320px"></select><button class="btn ghost sm" id="an_task_refresh">刷新</button>
+        <button class="btn" id="an_run">本地回填</button>
       </div>
+      <details class="advanced"><summary>改用恢复包文件（换机或从备份恢复时）</summary>
+        <div class="row" style="margin-top:10px"><label>恢复包</label><input type="file" id="an_pkg" accept=".tuominmap,.json" /><input id="an_pass" type="password" placeholder="恢复包口令（不保存）" /></div>
+      </details>
       <div id="an_diff"></div>
       <div class="row" id="an_confirm_row" style="display:none;margin-top:10px">
-        <label class="ck"><input type="checkbox" id="an_confirm" /> 回答未引用任何占位符，确认按原文返回</label>
+        <label class="ck"><input type="checkbox" id="an_confirm" /> 回答没有引用任何占位符，按原文返回</label>
         <button class="btn sm" id="an_confirm_btn">确认</button>
       </div>
       <div class="pane before" style="margin-top:12px">
         <div class="ph"><span class="dot" style="background:var(--ok)"></span> 回填后的回答</div>
-        <div class="body" id="an_out"><span class="empty">这里显示回填后的回答。</span></div>
+        <div class="body" id="an_out"><span class="empty">回填后在这里显示。</span></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn ghost sm" id="an_dl" disabled>下载回填结果 MD</button>
+        <button class="btn" id="an_dl" disabled>保存回填结果…</button>
       </div>
     </div>
   </section>
 
-  <!-- ===== 可信预览 ===== -->
+  <!-- ===== 核对与原值 ===== -->
   <section class="tab" id="tab-preview">
+    <header class="page-head"><h1>核对与原值</h1><p>发出去之前最后看一眼：原文、脱敏结果、AI 回答、回填结果并排对照。原文只在本机读取，不上传、不缓存。</p></header>
     <div class="card">
-      <h2>可信预览</h2>
-      <p class="hint">四个面板对照：原文只在本机读取（不上传服务器）；占位符高亮并统计标签。所有内容不缓存、不写 localStorage。</p>
       <div class="row">
-        <label>原文件（仅本机读取）</label><input type="file" id="pv_orig" />
-        <label>脱敏 MD</label><input type="file" id="pv_red" accept=".md,.txt" />
+        <label>原文件</label><input type="file" id="pv_orig" />
+        <label>脱敏文本</label><input type="file" id="pv_red" accept=".md,.txt" />
         <label>AI 回答</label><input type="file" id="pv_ans" accept=".md,.txt" />
       </div>
-      <div class="row" style="margin-top:10px">
-        <label>或直接粘贴 AI 回答</label>
-        <textarea id="pv_ans_text" rows="4" style="width:100%" placeholder="粘贴 AI 原回答…"></textarea>
+      <div class="row">
+        <textarea id="pv_ans_text" rows="4" style="width:100%" placeholder="或直接粘贴 AI 回答……"></textarea>
       </div>
       <div class="pane before" style="margin-top:12px">
         <div class="ph"><span class="dot" style="background:var(--warn)"></span> 原文（本机）</div>
@@ -417,33 +231,39 @@
       </div>
       <div class="pane after" style="margin-top:12px">
         <div class="ph"><span class="dot" style="background:var(--accent)"></span> 脱敏结果</div>
-        <div class="body" id="pv_red_out"><span class="empty">导入脱敏 MD 后显示。</span></div>
+        <div class="body" id="pv_red_out"><span class="empty">导入脱敏文本后显示。</span></div>
         <div class="kv" id="pv_red_counts"></div>
       </div>
       <div class="pane after" style="margin-top:12px">
-        <div class="ph"><span class="dot" style="background:var(--accent-2)"></span> AI 原回答</div>
+        <div class="ph"><span class="dot" style="background:var(--accent-2)"></span> AI 回答</div>
         <div class="body" id="pv_ans_out"><span class="empty">导入或粘贴后显示。</span></div>
         <div class="kv" id="pv_ans_counts"></div>
       </div>
       <div class="pane before" style="margin-top:12px">
         <div class="ph"><span class="dot" style="background:var(--ok)"></span> 回填结果</div>
-        <div class="body" id="pv_ref_out"><span class="empty">在下方解锁区选择恢复包并回填后显示。</span></div>
+        <div class="body" id="pv_ref_out"><span class="empty">在下方选择恢复包并回填后显示。</span></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <label>恢复包</label><input type="file" id="pv_pkg" accept=".tuominmap,.json" />
-        <input id="pv_pass" type="password" placeholder="恢复包口令（不保存）" />
-        <button class="btn sm" id="pv_refill">▶ 回填 AI 回答</button>
-        <button class="btn ghost sm" id="pv_ref_dl" disabled>下载回填结果</button>
+        <label>对应任务</label><select id="pv_task" style="min-width:300px"></select>
+        <button class="btn sm" id="pv_refill">回填 AI 回答</button>
+        <button class="btn ghost sm" id="pv_ref_dl" disabled>保存回填结果…</button>
       </div>
+      <details class="advanced"><summary>改用恢复包文件</summary>
+        <div class="row" style="margin-top:10px"><label>恢复包</label><input type="file" id="pv_pkg" accept=".tuominmap,.json" /><input id="pv_pass" type="password" placeholder="恢复包口令（不保存）" /></div>
+      </details>
       <div id="pv_msg"></div>
     </div>
-    <div class="card" style="background:rgba(251,113,133,.07);border-color:rgba(251,113,133,.35)">
-      <h2>原值视图（占位符 ↔ 原值）</h2>
-      <p class="hint"><b>敏感区域</b>：此处显示真实原值，请勿截图、复制或转发。离开本页、切换标签或 90 秒无操作将自动锁定；不写任何缓存与日志。</p>
+    <div class="card danger-zone">
+      <h2>原值对照表（占位符 ↔ 原值）</h2>
+      <p class="hint"><b>敏感区域</b>：这里会显示真实原值，请勿截图、复制或转发。离开本页、切换窗口或 90 秒无操作会自动锁定，不写任何缓存与日志。原值来自本机保存的任务映射，不需要口令。</p>
+      <div id="clipboardMapping" hidden>
+        <div class="row"><button class="btn sm" id="clipboardMapUnlock">显示剪贴板对照表</button><span id="clipboardMapMessage" class="meta" role="status"></span></div>
+      </div>
       <div class="row">
-        <button class="btn sm" id="pv_unlock">🔓 口令解锁原值视图</button>
+        <button class="btn sm" id="pv_task_unlock">显示所选任务的原值</button>
+        <button class="btn ghost sm" id="pv_unlock">用恢复包解锁</button>
         <button class="btn ghost sm" id="pv_lock" disabled>立即锁定</button>
-        <span class="hint" id="pv_lock_state"></span>
+        <span class="hint" id="pv_lock_state" style="margin:0"></span>
       </div>
       <div id="pv_map"></div>
     </div>
@@ -451,135 +271,223 @@
 
   <!-- ===== 记录 ===== -->
   <section class="tab" id="tab-records">
+    <header class="page-head"><h1>记录</h1><p>只记文件名、哈希、计数和版本，不存正文与原值。删除任务会一并删除它的映射，不可恢复。</p></header>
     <div class="card">
-      <h2>文件任务记录</h2>
-      <p class="hint">只存文件名、哈希、计数和版本——不存正文与原值。删除任务会同步删除其映射授权，不可恢复。</p>
-      <div class="row"><button class="btn ghost sm" id="rec_refresh">刷新</button></div>
+      <div class="dictionary-context"><h2>文件任务</h2><button class="btn ghost sm" id="rec_refresh">刷新</button></div>
       <div id="recJobs"><div class="empty">加载中…</div></div>
     </div>
     <div class="card">
       <h2>调用账本</h2>
-      <p class="hint">各入口（workbench / api / proxy / cli）的调用记录：耗时、字符数、标签计数、是否阻断。</p>
+      <p class="hint">每一次脱敏或回填调用的入口、耗时、字符数、标签计数与是否阻断。</p>
       <div id="recCalls"><div class="empty">加载中…</div></div>
     </div>
   </section>
 
-  <!-- ===== 词典 ===== -->
+  <!-- ===== 本地词典 ===== -->
   <section class="tab" id="tab-dict">
+    <header class="page-head"><h1>本地词典</h1><p>把本单位、项目、客户的名称和简称加进来，它们就会和人名、电话、账号一样被识别并替换。词典只在本机，脱敏时按应用使用。</p></header>
     <div class="card">
-      <div class="row">
-        <label>选择应用</label>
-        <select id="dictApp"></select>
-        <button class="btn ghost sm" id="reloadBtn">重载词典缓存</button>
-        <span id="dictAppMeta" class="meta"></span>
+      <div class="dictionary-context">
+        <h2 id="dictCurrent" aria-live="polite">当前编辑：尚未选择应用的词典</h2>
+        <div class="row">
+          <label>词典所属应用</label>
+          <select id="dictApp"></select>
+          <button class="btn ghost sm" id="reloadBtn">重载缓存</button>
+        </div>
       </div>
+      <p class="hint" id="dictReadonly" hidden style="margin-top:8px">演示模式下词典只读。</p>
+      <p class="meta" id="dictAppMeta" style="margin-top:8px"></p>
     </div>
     <div class="card">
-      <h2>本地词典词条</h2>
-      <p class="hint">词条是你自管的参考数据；加密映射里的原值永不出现在此界面。</p>
-      <div class="row" style="margin-bottom:10px">
-        <input id="f_canonical" placeholder="规范值（必填，如 示例建设集团）" />
-        <input id="f_label" placeholder="标签（必填，如 ORG/PERSON）" style="min-width:130px" />
-        <input id="f_aliases" placeholder="别名，逗号分隔（可选）" />
+      <h2>添加词条</h2>
+      <div class="row">
+        <input id="f_canonical" placeholder="名称（必填，如 示例建设集团有限公司）" style="min-width:260px" />
+        <input id="f_label" placeholder="类型（必填，如 ORG / PERSON / PROJECT）" style="min-width:200px" />
+        <input id="f_aliases" placeholder="简称或别名，逗号分隔（可选）" style="min-width:220px" />
         <select id="f_risk"><option>high</option><option>medium</option><option>low</option><option>critical</option></select>
-        <button class="btn sm" id="addBtn">添加词条</button>
+        <button class="btn sm" id="addBtn">添加</button>
       </div>
+      <p class="hint" style="margin-top:10px">类型用大写英文，例如 ORG（单位）、PERSON（人名）、PROJECT（项目）、SUPPLIER（供应商）。同一实体的简称填在别名里，脱敏时会按你当时写的写法还原。</p>
+    </div>
+    <div class="card" id="dictImportCard">
+      <h2>批量导入</h2>
+      <p class="hint">每行一个：<code>名称,类型,别名|别名,风险</code>，后三项可省略。类型可写 ORG / PERSON / PROJECT，或 单位、人名、项目、供应商、客户、地址。也可以选 CSV、Excel（.xlsx，第一张表，表头含「名称」「类型」「别名」「风险」）或之前导出的 JSON。先预览，确认后才写入。</p>
+      <div class="row">
+        <label for="di_source">来源</label>
+        <select id="di_source"><option value="text">粘贴文本</option><option value="file">选择文件</option><option value="app">从其他应用复制</option></select>
+        <label for="di_label">缺省类型</label>
+        <select id="di_label"><option value="">（每行自己写）</option><option>ORG</option><option>PERSON</option><option>PROJECT</option><option>SUPPLIER</option><option>CUSTOMER</option><option>ADDRESS</option></select>
+        <input type="file" id="di_file" accept=".csv,.txt,.xlsx,.json" hidden />
+        <select id="di_app" hidden></select>
+      </div>
+      <textarea id="di_text" rows="6" placeholder="示例建设集团有限公司,单位,示例建设|示例集团&#10;张三,人名&#10;滨江新城项目,项目" style="width:100%;margin-top:8px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost sm" id="di_preview">预览</button>
+        <button class="btn sm" id="di_commit" disabled>确认导入</button>
+        <span class="meta" id="di_summary" role="status"></span>
+      </div>
+      <div id="di_rows" class="call-ledger" style="margin-top:8px"></div>
+    </div>
+    <div class="card" id="dictLearnCard">
+      <h2>从脱敏结果学习</h2>
+      <p class="hint">把某次文件脱敏、智能体会话里识别出的单位、人名、地址等列出来（已在词典里的不再列），勾选后加入当前词典，下次就能稳定识别。</p>
+      <div class="row">
+        <label for="dl_task">来自</label><select id="dl_task" style="min-width:320px"></select>
+        <button class="btn ghost sm" id="dl_find">查找新名称</button>
+        <button class="btn sm" id="dl_add" disabled>加入词典</button>
+        <span class="meta" id="dl_msg" role="status"></span>
+      </div>
+      <div id="dl_rows" class="call-ledger" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>词条</h2>
+      <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="dict_export_csv">导出 CSV</button><button class="btn ghost sm" id="dict_export_json">导出 JSON</button><span class="meta">导出的文件含词典原值，请妥善保存。</span></div>
       <div id="dictArea"><div class="empty">请选择一个配置了词典的应用。</div></div>
     </div>
   </section>
 
-  <!-- ===== 应用 ===== -->
+  <!-- ===== 应用与档位 ===== -->
   <section class="tab" id="tab-apps">
+    <header class="page-head"><h1>应用与档位</h1><p>每个接入的工具对应一个应用，决定用哪个词典和多严的档位。桌面使用默认用「本机工作台」，一般不需要再建。</p></header>
     <div class="card">
-      <h2>注册新应用 / 更新</h2>
-      <p class="hint">写回 <code>tuomin_apps.json</code>（保留其它键）。已存在的 app_id 会被更新。</p>
+      <h2>新建或更新应用</h2>
       <div class="row">
-        <input id="a_id" placeholder="app_id（如 my_app）" />
+        <input id="a_id" placeholder="应用标识（英文，如 my_app）" />
+        <input id="a_name" placeholder="显示名称（可选）" />
         <label>敏感级</label>
         <select id="a_sens"></select>
-        <input id="a_dict" placeholder="词典文件绝对路径（可选）" style="min-width:280px" />
         <button class="btn sm" id="a_save">保存</button>
       </div>
+      <p class="hint" style="margin-top:10px">新应用会自动获得一个空词典，保存后到「本地词典」里添加词条。</p>
     </div>
     <div class="card">
-      <h2>已注册应用</h2>
+      <h2>已有应用</h2>
       <div id="appsArea"><div class="empty">加载中…</div></div>
     </div>
   </section>
 
-  <!-- ===== WorkBuddy 接入向导 ===== -->
+  <!-- ===== 工具接入 ===== -->
   <section class="tab" id="tab-onboard">
-    <div class="card">
-      <h2>WorkBuddy 接入向导</h2>
-      <p class="hint">把本机 Tuomin 网关接成 WorkBuddy 的自定义模型：自动定位网关端口 → 生成三条条目 → 写入 <code>~/.workbuddy/models.json</code>（自动备份、旧端口自愈、实测热加载生效）。上游 API key 由你提供，只写入 WorkBuddy 本地配置，<b>不落 Tuomin、不进日志</b>。</p>
+    <header class="page-head"><h1>工具接入</h1><p>让其他 AI 工具通过本机网关使用脱敏：一键接入 MCP 与 Skill、聊天端点，以及 WorkBuddy 自定义模型。</p></header>
+    <div class="card" id="agentCard">
+      <h2>AI 工具一键接入（MCP + Skill）</h2>
+      <p class="hint">让 Claude Code、Codex、Cursor、Claude Desktop、WorkBuddy 在对话里直接调用本机脱敏。写入的配置只包含 Tuomin 的启动路径，不含任何凭证；AI 只能脱敏，不能回填或查看原值，回填在「回答回填」里选择对应的智能体会话。</p>
       <div class="row">
-        <label>项目 app</label>
+        <label for="agentSource">智能体使用的词典</label><select id="agentSource"></select>
+        <button class="btn ghost sm" id="agentSaveSource">应用</button>
+        <button class="btn sm" id="agentSelftest">自检</button>
+        <button class="btn ghost sm" id="agentSkillZip">下载 skill</button>
+        <button class="btn ghost sm" id="agentRotate">更换凭证</button>
+      </div>
+      <p class="meta" id="agentCommandWarn" role="alert"></p>
+      <div id="agentClients" class="agent-clients"><div class="empty">加载中…</div></div>
+      <div id="agentSelftestOut" aria-live="polite"></div>
+      <details style="margin-top:12px"><summary class="meta">MCP 启动命令（手动配置其他客户端）</summary>
+        <div class="copy-line"><code id="mcpCommand">/Applications/Tuomin.app/Contents/MacOS/tuomin-workbench --mcp-stdio</code><button class="btn ghost sm" id="copyMcp">复制</button></div>
+        <p class="hint">任何支持 STDIO MCP 的客户端都可以用这条命令。命令从本机数据目录读取凭证；Tuomin 没在运行时会自动在后台启动。</p>
+      </details>
+    </div>
+    <div class="card">
+      <h2>各应用的聊天端点</h2>
+      <p class="hint">复制对应应用的端点到客户端。masked 只脱敏，demo 在思维链里保留占位符，auto 透明回填；后两者受该应用权限约束。端点里不含凭证。</p>
+      <div id="integrationEndpoints"><div class="empty">加载中…</div></div>
+    </div>
+    <div class="card">
+      <h2>WorkBuddy 接入</h2>
+      <p class="hint" id="workbuddyDemoHint" hidden>演示模式只展示接入配置，不写入 WorkBuddy 或执行外部校验。</p>
+      <p class="hint">把本机网关接成 WorkBuddy 的自定义模型：自动定位端口，生成三条条目，写入 <code>~/.workbuddy/models.json</code>（自动备份、旧端口自愈）。上游 API key 只写进 WorkBuddy 本地配置，不进 Tuomin、不进日志。</p>
+      <div class="row">
+        <label>应用</label>
         <select id="w_app"></select>
         <button class="btn ghost sm" id="w_status">检查网关</button>
         <span id="w_gateway" class="meta"></span>
       </div>
-      <div class="row" style="margin-top:10px">
+      <div class="row">
         <label>上游 API key</label>
-        <input id="w_key" type="password" placeholder="sk-… （只写入 WorkBuddy 本地 models.json）" style="min-width:340px" />
+        <input id="w_key" type="password" placeholder="sk-…（只写入 WorkBuddy 本地 models.json）" style="min-width:340px" />
         <button class="btn" id="w_apply">生成并写入 WorkBuddy</button>
         <button class="btn ghost" id="w_verify">校验</button>
       </div>
-      <div class="row" style="margin-top:10px">
-        <span id="w_msg" class="meta"></span>
-      </div>
+      <div class="row"><span id="w_msg" class="meta"></span></div>
       <div id="w_result" style="margin-top:12px"></div>
-    </div>
-    <div class="card">
-      <h2>还没有项目 app？一键创建</h2>
-      <p class="hint">按 WorkBuddy 需要的档位创建：<code>strict</code> + <code>refill_strict:false</code> + <code>allow_auto_refill:true</code>，并钉住上游模型（客户端无法偷换模型）。</p>
+      <h3>还没有项目应用？一键创建</h3>
+      <p class="hint">按 WorkBuddy 需要的档位创建（strict、不严格回填、允许透明回填），并钉住上游模型。</p>
       <div class="row">
-        <input id="w_new" placeholder="app_id（如 my_project）" />
+        <input id="w_new" placeholder="应用标识（如 my_project）" />
         <input id="w_upstream_model" placeholder="上游模型，默认 deepseek-v4-flash" />
-        <input id="w_upstream_url" placeholder="上游地址（可选）" style="min-width:320px" />
+        <input id="w_upstream_url" placeholder="上游地址（可选）" style="min-width:300px" />
         <button class="btn sm" id="w_create">创建</button>
       </div>
+      <h3>在 WorkBuddy 里怎么用</h3>
+      <ol class="hint" style="line-height:1.9;padding-left:18px">
+        <li>写入后到 WorkBuddy 的模型列表中确认；若未出现，重新打开会话或重启 WorkBuddy。</li>
+        <li>在模型下拉里选「&lt;应用&gt;·脱敏·无感回填」日常使用；要看脱敏证据选「思维链mask」；自检用「全mask」。</li>
+        <li>只有走该自定义模型的会话经过 Tuomin，WorkBuddy 内置模型不经过网关。</li>
+      </ol>
     </div>
     <div class="card">
-      <h2>在 WorkBuddy 里怎么用</h2>
-      <ol class="hint" style="line-height:1.9">
-        <li>写入成功后 WorkBuddy 会自动重载 <code>models.json</code>（本机实测热加载，通常无需重启）。</li>
-        <li>打开任意会话，在模型下拉里选 <b>「&lt;app&gt;·脱敏·无感回填」</b>（日常使用）；要看脱敏证据选「思维链mask」；自检用「全mask」。</li>
-        <li>只有走该自定义模型的会话经过 Tuomin；WorkBuddy 内置模型不走网关。</li>
-      </ol>
+      <h2>实时调用</h2>
+      <p class="hint">只显示入口、应用、耗时、计数和阻断标记，无正文。本页打开时每 3 秒刷新。</p>
+      <div id="integrationCalls" class="call-ledger" aria-live="polite"><div class="empty">暂无调用记录。</div></div>
+      <span id="integrationCallStatus" class="meta"></span>
     </div>
   </section>
 
   <!-- ===== 设置 ===== -->
   <section class="tab" id="tab-settings">
+    <header class="page-head"><h1>设置</h1><p>剪贴板、快捷键、登录自启，以及服务运行信息。</p></header>
+    <div class="card" id="shellSettings" hidden>
+      <h2>剪贴板与快捷键</h2>
+      <div class="row"><label for="shellSource">剪贴板使用的词典</label><select id="shellSource"></select><label for="shellIdle">空闲多久后新建会话</label><select id="shellIdle"><option value="8">8 小时</option><option value="24">24 小时</option><option value="never">永不</option><option value="custom">自定义</option></select><input id="shellIdleCustom" type="number" min="0.01" max="720" step="any" aria-label="自定义空闲小时数" hidden /></div>
+      <div class="row"><label class="ck"><input id="shellHotkeys" type="checkbox" />启用全局快捷键</label></div>
+      <div class="hotkey-grid">
+        <div class="hotkey-row"><label for="shellRedactKey">脱敏剪贴板</label><input id="shellRedactKey" class="hotkey-input" data-hotkey="redact" autocomplete="off" spellcheck="false" placeholder="点这里，然后按组合键" /><span class="kbd" data-hotkey-display="redact"></span><button class="btn ghost sm" type="button" data-hotkey-clear="shellRedactKey">清除</button></div>
+        <div class="hotkey-row"><label for="shellRefillKey">回填剪贴板</label><input id="shellRefillKey" class="hotkey-input" data-hotkey="refill" autocomplete="off" spellcheck="false" placeholder="点这里，然后按组合键" /><span class="kbd" data-hotkey-display="refill"></span><button class="btn ghost sm" type="button" data-hotkey-clear="shellRefillKey">清除</button></div>
+        <div class="hotkey-row"><label for="shellRedactSelectionKey">脱敏选中文字</label><input id="shellRedactSelectionKey" class="hotkey-input" data-hotkey="redact_selection" autocomplete="off" spellcheck="false" placeholder="点这里，然后按组合键" /><span class="kbd" data-hotkey-display="redact_selection"></span><button class="btn ghost sm" type="button" data-hotkey-clear="shellRedactSelectionKey">清除</button></div>
+        <div class="hotkey-row"><label for="shellRedactPasteKey">选中脱敏并替换</label><input id="shellRedactPasteKey" class="hotkey-input" data-hotkey="redact_paste" autocomplete="off" spellcheck="false" placeholder="点这里，然后按组合键" /><span class="kbd" data-hotkey-display="redact_paste"></span><button class="btn ghost sm" type="button" data-hotkey-clear="shellRedactPasteKey">清除</button></div>
+        <div class="hotkey-row"><label for="shellRefillPasteKey">选中回填并替换</label><input id="shellRefillPasteKey" class="hotkey-input" data-hotkey="refill_paste" autocomplete="off" spellcheck="false" placeholder="点这里，然后按组合键" /><span class="kbd" data-hotkey-display="refill_paste"></span><button class="btn ghost sm" type="button" data-hotkey-clear="shellRefillPasteKey">清除</button></div>
+      </div>
+      <p class="hint" id="shellHotkeyHint" style="margin-top:8px">点输入框后直接按组合键（Esc 取消，Delete 清除），也可以手写 alt+cmd+d。字母和数字需要搭配 ⌘、⌥ 或 ⌃；F13–F20 可单独使用。留空即不绑定，菜单栏里的动作始终可用。</p>
+      <p class="hint">「选中文字」三项不用先复制：选中文字按快捷键即可。「脱敏选中文字」把结果放进剪贴板；两个「替换」会直接替换选中内容，并恢复你原来的剪贴板。</p>
+      <div class="row" id="shellAccessRow" hidden><span id="shellAccessState" class="meta"></span><button class="btn ghost sm" type="button" id="shellAccessGrant">请求授权</button><button class="btn ghost sm" type="button" id="shellAccessOpen">打开系统设置</button></div>
+      <div class="row"><label class="ck"><input id="shellAutostart" type="checkbox" />登录时启动</label><span id="shellAutostartHint" class="meta"></span></div>
+      <div class="row" style="margin-top:14px"><button id="saveShellSettings" class="btn sm">保存设置</button><button id="showShellOnboarding" class="btn ghost sm">重新打开首次向导</button><span id="shellSettingsMessage" class="meta" role="status"></span></div>
+      <div id="shellHotkeyErrors" class="meta" role="alert"></div>
+    </div>
+    <div class="card" id="adminTokenBar">
+      <h2>管理 Token（外部浏览器）</h2>
+      <p class="hint">在原生窗口里会自动注入，不需要填写。用浏览器打开时，从本机数据目录的 <code>admin-token</code> 文件复制。不要把 Token 放进 URL、聊天或截图。</p>
+      <div class="tokenbar">
+        <input id="adminToken" type="password" placeholder="粘贴管理 Token" />
+        <button class="btn ghost sm" id="saveToken">保存</button>
+        <span id="tokenMeta" class="meta"></span>
+      </div>
+    </div>
     <div class="card">
-      <h2>运行时设置（只读）</h2>
+      <h2>运行信息</h2>
       <div id="settings" class="meta">加载中…</div>
       <div class="kv" id="settingsKv"></div>
-      <div class="meta" style="margin-top:12px">更多：<a href="/docs" target="_blank">/docs API 文档</a> · <a href="/healthz" target="_blank">/healthz</a></div>
-    </div>
-  </section>
-
-  <!-- ===== 授权（离线授权码） ===== -->
-  <section class="tab" id="tab-license">
-    <div class="card">
-      <h2>授权状态</h2>
-      <p class="hint">离线授权仅用于控制新建任务；已有数据的回填与导出不受授权到期影响。</p>
-      <div id="licenseStatus" class="meta">加载中…</div>
-      <div id="licenseKv" class="kv"></div>
-    </div>
-    <div class="card">
-      <h2>激活授权</h2>
-      <p class="hint">授权码在本机校验并保存。重新激活可用于续期或更换授权。</p>
-      <textarea id="licenseCode" placeholder="粘贴从发行方获取的授权码（TM1. 开头）"></textarea>
-      <div class="row" style="margin-top:10px">
-        <button class="btn" id="licenseActivate">激活</button>
-        <span id="licenseError" class="meta" style="color:var(--danger)"></span>
-      </div>
+      <div class="meta" style="margin-top:12px"><a href="/docs" target="_blank">API 文档</a> · <a href="/healthz" target="_blank">健康检查</a></div>
     </div>
   </section>
 </main>
-<div id="toast"></div>
+</div>
 
+<dialog id="shellOnboarding" aria-labelledby="shellOnboardingTitle">
+  <h2 id="shellOnboardingTitle">欢迎使用 Tuomin</h2>
+  <p class="hint">复制文字后，从菜单栏选择「脱敏剪贴板」，再粘贴给 AI。复制含占位符的回答后选择「回填剪贴板」，就能在本机还原。</p>
+  <div class="row" style="margin-top:16px"><label for="onboardSource">剪贴板使用的词典</label><select id="onboardSource"></select></div>
+  <div class="row" style="margin-top:12px"><label class="ck"><input type="checkbox" id="onboardAutostart" />登录时启动</label><span id="onboardAutostartHint" class="meta"></span></div>
+  <div class="onboard-guide">
+    <div><b>快捷键</b><span>复制后按 <span class="kbd" id="onboardRedactKey">⌥⌘D</span> 脱敏、<span class="kbd" id="onboardRefillKey">⌥⌘R</span> 回填；还可以设置"选中即脱敏"。</span><button class="btn ghost sm" type="button" data-onboard-go="settings">修改</button></div>
+    <div><b>接入 AI 工具</b><span>Claude Code、Codex、Cursor、Claude Desktop、WorkBuddy 一键接入，对话里直接调用本机脱敏。</span><button class="btn ghost sm" type="button" data-onboard-go="onboard">去接入</button></div>
+    <div><b>导入词典</b><span>把本单位、客户、项目名称批量导入（粘贴、CSV、Excel 都行），识别更稳。</span><button class="btn ghost sm" type="button" data-onboard-go="dict">去导入</button></div>
+  </div>
+  <p class="hint" style="margin-top:10px">空闲 8 小时后新建剪贴板会话，可在设置里改。系统通知被关闭时，菜单栏仍会显示结果。Windows 可从托盘选择文件脱敏；Mac 可把文件拖到 Dock 或菜单栏图标上。</p>
+  <div class="row"><button class="btn" id="finishShellOnboarding">完成</button><button class="btn ghost" id="laterShellOnboarding">稍后设置</button><span id="onboardMessage" class="meta" role="status"></span></div>
+</dialog>
+<div id="saveBar" hidden role="status"><span id="saveBarText"></span><button class="btn ghost sm" id="saveBarReveal">打开所在文件夹</button><button class="btn ghost sm" id="saveBarClose" aria-label="关闭">×</button></div>
+<div id="toast"></div>
 <script>
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
@@ -599,6 +507,85 @@ const SAMPLES = {
     text:"上诉人示例建设集团有限公司与被上诉人示范地产开发有限公司建设工程施工合同纠纷一案，不服一审判决上诉，由北京市高级人民法院二审审理。涉案工程款人民币8,500,000.00元，约定2025年12月30日前支付，被上诉人逾期未付；二审依据民法典及建工司法解释审查工程款及违约金。工程地址浙江省杭州市西湖区文三路100号。" },
 };
 
+// 把服务端错误码翻译成"出了什么事 + 该怎么办"，用户不该只看到一段英文代码。
+const ERROR_GUIDE = {
+  egress_blocked: "出站闸门未通过：内容里仍有不可外发的信息（如密钥、完整私钥），或检测器未就绪。请按上方闸门说明处理后重试；也可以只在本机预览。",
+  detector_unavailable: "本地识别模型还没就绪。请稍等片刻再试；Lite 版不含模型，完整功能请用 Full 版。",
+  ner_unavailable: "本地识别模型不可用。Lite 版不含模型，完整功能请用 Full 版。",
+  document_too_large: "文件超过了工作台的大小上限。请拆分文件后再试。",
+  unsupported_format: "不支持这种文件格式。原格式脱敏支持 DOCX、XLSX、PPTX，以及可转换的 DOC、XLS；其他格式请先在 Office 里另存为这些格式。",
+  converter_unavailable: "本机没有可用的旧格式转换程序。请安装 LibreOffice，或先用 Office 把文件另存为 .docx / .xlsx。",
+  conversion_failed: "旧格式转换失败。请用 Office 打开后另存为 .docx / .xlsx 再试。",
+  unsupported_legacy_format: "只支持 .doc 和 .xls 的旧格式转换。",
+  embedded_object: "文件含无法处理的嵌入对象（OLE、ActiveX 或非 Excel 的嵌入文件；括号里是具体部件）。请在 Office 中删除或转换这些对象后再试。图表只带外部数据引用而没有真实嵌入文件时不会报这个错。",
+  ole_object_present: "文件含 OLE 嵌入对象（如 WPS 公式）。可以点「移除嵌入对象后继续」，正文脱敏不受影响；或在 Word 中把对象转成图片后再试。",
+  macro_present: "文件含宏。请另存为不含宏的 .docx / .xlsx / .pptx 再试。",
+  encrypted_package: "文件设置了打开密码。请先去掉密码再试。",
+  digital_signature: "文件带数字签名，改写会使签名失效。请先在 Office 中移除签名。",
+  unsupported_data_container: "文件含暂不支持的数据部件：查询表、数据模型、切片器或日程表（括号里是具体部件）。透视表和外部工作簿链接已支持。可在 Office 中删除该对象，或改用「解析并脱敏」得到文本版。",
+  unsupported_comments: "文件使用了不支持的批注格式。请在 Office 中删除批注或转为普通文字后再试。",
+  external_link: "文件引用了不支持的外部资源（如链接到外部文件的图片或对象；外部工作簿链接本身已支持）。请在 Office 中断开该链接后再试。",
+  readonly_text_replacement: "命中的敏感文字位于公式字串、工作表名、超链接地址等不能改写的位置（提示里列出了具体位置）。请在 Office 中把该处改为普通文字（例如改掉含公司名的工作表名），或改用「解析并脱敏」得到文本版。",
+  smartart_present: "文件含 SmartArt，暂不支持原格式脱敏。请先把 SmartArt 转为文本或图片，或改用「解析并脱敏」。",
+  not_a_package: "文件不是有效的 Office 文档，或已损坏。请用 Office 重新保存后再试。",
+  invalid_xml: "文件内部结构损坏。请用 Office 重新保存后再试。",
+  unsafe_xml: "文件内部含有外部实体声明（DTD），为安全起见已拒绝处理。请用 Office 重新保存后再试。",
+  document_extraction_failed: "无法解析这个文件。请确认它能在 Office 中正常打开，必要时另存一份再试。",
+  unknown_app: "所选应用不存在。请刷新页面后重新选择。",
+  app_has_no_upstream: "这个应用没有配置上游模型地址，网关会以 502 拒绝 WorkBuddy 的每次对话。请用「一键创建」新建项目应用（填上游地址与模型），不要选文件 / 剪贴板工作台的应用。",
+  no_gateway_serves_app: "没有在线网关挂载这个应用。请确认 Tuomin 正在运行，并在同一个网关里注册了该应用。",
+  job_not_found: "找不到这个任务，可能已被删除。请重新脱敏，或展开「改用恢复包文件」。",
+  mapping_unavailable: "这个任务的映射已不在本机（可能过期或被删除）。请重新脱敏，或展开「改用恢复包文件」用备份恢复。",
+  job_not_completed: "这个任务没有完成脱敏，无法回填。请重新脱敏。",
+  format_mismatch: "所选任务与这个文件的格式不一致。请选择脱敏该文件时的那条任务。",
+  package_rejected: "恢复包与口令不匹配，或恢复包不属于这个任务。请核对口令和任务。",
+  invalid_package: "恢复包文件无效。请确认选的是 .tuominmap 文件。",
+  reserved_placeholder_conflict: "文本里已经有 <ORG_001> 这样的占位符，不能再次脱敏。如果这是 AI 的回答，请用「回答回填」。",
+  cancelled: "已终止，本次没有生成结果。",
+  readonly_placeholder: "占位符位于只读结构中，无法回填。请检查文件是否经过改动。",
+  unknown_placeholder: "回答里有本任务没有的占位符，可能选错了任务或 AI 改写了占位符。请核对后重试。",
+  altered_placeholder: "回答里的占位符被改写过（如大小写或编号变化）。请改回原样后重试。",
+  missing_placeholder: "脱敏文本里少了部分占位符，可能被编辑过。请核对差异后确认回填。",
+  duplicated_placeholder: "占位符出现次数与脱敏时不一致，可能被编辑过。请核对差异后确认回填。",
+  placeholder_split_across_runs: "占位符在 Word 里被拆成了多段（通常是编辑或拼写检查造成）。请在 Word 中重新输入该占位符后再试。",
+};
+function explainError(data, status) {
+  data = data || {};
+  const types = Array.isArray(data.error_types) ? data.error_types : [];
+  if (types.length) {
+    const known = types.map((t) => ERROR_GUIDE[t]).filter(Boolean);
+    return known.length ? known.join(" ") : "回填被阻断：" + types.join("、");
+  }
+  const code = (data.error && data.error.code) || (typeof data.detail === "string" && data.detail.split(":")[0].trim()) || "";
+  const raw = (data.error && data.error.message) || data.detail || "";
+  const guide = ERROR_GUIDE[code];
+  const detail = raw && raw.includes("（") ? raw.slice(raw.indexOf("（")) : "";
+  if (guide) return guide + (detail ? " " + detail : "");
+  if (status === 401) return "管理 Token 无效或未设置，请到「设置」页填写。";
+  if (status >= 500) return "本机服务内部出错（HTTP " + status + "）。请重试；若反复出现，到「记录」页复制 task_id 反馈。";
+  return (raw ? raw + "。" : "") + "处理失败" + (status ? "（HTTP " + status + "）" : "") + "。请重试；若反复出现，到「记录」页复制调用信息反馈。";
+}
+// Parser notices arrive as English codes from the extractors; users see Chinese.
+// null hides notices that carry no action for the user.
+const WARNING_TEXT = {
+  DOCX_RENDERED_PAGES_UNAVAILABLE: null,
+  DOCX_NESTED_TABLE_FLATTENED: "文档里的嵌套表格已展开成所在单元格的文字，排版以原文件为准。",
+  DOCX_ALTCHUNK_NOT_EXTRACTED: "文档里嵌入的其他文档片段未展开，其中内容没有脱敏，请人工检查。",
+  DOCX_MEDIA_NOT_OCR: "文档里的图片没有做文字识别，图片中的敏感信息不会被脱敏，请人工检查。",
+  DOCX_TRACKED_CHANGES_PRESENT: "文档含修订记录，插入和删除的内容都已保留并脱敏，请核对。",
+  DOCX_EMBEDDED_OBJECT_NOT_EXTRACTED: "文档含嵌入对象，其中内容没有解析，请人工检查。",
+  DOCX_OPTIONAL_PART_INVALID: "文档的某个附属部件无法读取，已跳过。",
+  PDF_PAGE_NEEDS_OCR: "部分 PDF 页面是扫描图片，没有可识别的文字，这些页没有脱敏。",
+  PDF_TWO_COLUMN_REORDERED: "检测到双栏排版，已按阅读顺序重排文字。",
+  PDF_GARBLED_TEXT: "PDF 的文字编码异常，部分内容可能是乱码，请核对。",
+  TEXT_DECODE_REPLACEMENT: "文件中有无法识别的字符，已用替代符号表示。",
+  NO_TEXT_EXTRACTED: "没有从文件中读到任何文字。",
+};
+function warningText(w) {
+  if (!w) return "";
+  if (Object.hasOwn(WARNING_TEXT, w.code)) return WARNING_TEXT[w.code];
+  return w.message || w.code || "";
+}
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1900); }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c])); }
 function getToken() { return localStorage.getItem("tuomin_admin_token") || ""; }
@@ -607,8 +594,8 @@ async function api(method, path, body) {
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const r = await fetch(path, opt);
   const data = await r.json().catch(() => ({}));
-  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
-  if (!r.ok) throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
+  if (!r.ok) throw new Error(explainError(data, r.status));
   return data;
 }
 
@@ -624,6 +611,7 @@ $$("#tabs button").forEach((b) => b.onclick = () => {
   $$("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
   $$("section.tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + b.dataset.tab));
 });
+$$("[data-go]").forEach((b) => b.onclick = () => { const t = $('#tabs button[data-tab="' + b.dataset.go + '"]'); if (t) t.click(); });
 
 // --- settings ---
 async function loadSettings() {
@@ -644,26 +632,52 @@ async function loadSettings() {
   fill($("#a_sens"), SETTINGS.sensitivities);
   buildProfileSelect();
 }
+// 界面只给少量中文默认项；勾选「全部档位」才显示服务端全部内部名称。
+const PROFILE_PRESETS = [
+  ["file_workbench", "通用：识别到的全部替换，可完整回填（推荐）"],
+  ["contract", "合同审查"],
+  ["pre_investment", "投资项目"],
+  ["litigation", "诉讼文书"],
+  ["strict", "严格：更多类别一律替换"],
+];
+const SENSITIVITY_LABELS = { light: "轻度", standard: "标准", strict: "严格", ultra: "极严" };
 function buildProfileSelect() {
-  const sel = $("#t_profile");
-  const grp = (label, items) => items && items.length
-    ? `<optgroup label="${label}">${items.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}</optgroup>` : "";
-  sel.innerHTML = `<option value="">（用应用默认 / strict）</option>` +
-    grp("场景", SETTINGS.scenarios) + grp("档位", SETTINGS.profiles) + grp("敏感级", SETTINGS.sensitivities);
+  const sel = $("#t_profile"), previous = sel.value;
+  const advanced = $("#t_adv") && $("#t_adv").checked;
+  const known = new Set([...(SETTINGS.scenarios || []), ...(SETTINGS.profiles || []), ...(SETTINGS.sensitivities || [])]);
+  let html = `<option value="">默认（跟随所选应用）</option>`;
+  if (!advanced) {
+    html += PROFILE_PRESETS.filter(([v]) => known.has(v)).map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+  } else {
+    const grp = (label, items, names) => items && items.length
+      ? `<optgroup label="${label}">${items.map((v) => `<option value="${esc(v)}">${esc(names && names[v] ? `${names[v]}（${v}）` : v)}</option>`).join("")}</optgroup>` : "";
+    const presetNames = Object.fromEntries(PROFILE_PRESETS);
+    html += grp("场景", SETTINGS.scenarios, presetNames) + grp("档位", SETTINGS.profiles, presetNames) + grp("敏感级", SETTINGS.sensitivities, SENSITIVITY_LABELS);
+  }
+  sel.innerHTML = html;
+  if ([...sel.options].some((o) => o.value === previous)) sel.value = previous;
 }
+if ($("#t_adv")) $("#t_adv").onchange = buildProfileSelect;
 function fill(sel, values) {
-  sel.innerHTML = ""; for (const v of values) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
+  sel.innerHTML = "";
+  for (const v of values) { const o = document.createElement("option"); o.value = v; o.textContent = SENSITIVITY_LABELS[v] ? `${SENSITIVITY_LABELS[v]}（${v}）` : v; sel.appendChild(o); }
+  if ([...sel.options].some((o) => o.value === "standard")) sel.value = "standard";
 }
-function fillApps(sel, apps) { sel.innerHTML = ""; for (const a of apps) { const o = document.createElement("option"); o.value = a.app_id; o.textContent = a.app_id + (a.has_dictionary ? "" : "（无词典）"); sel.appendChild(o); } }
+function fillApps(sel, apps) { sel.innerHTML = ""; for (const a of apps) { const o = document.createElement("option"); o.value = a.app_id; o.textContent = (a.name ? `${a.name}（${a.app_id}）` : a.app_id) + (a.has_dictionary ? "" : "（无词典）"); sel.appendChild(o); } }
 
 // --- dictionary tab ---
 // 文件脱敏的默认绑定应用：存在时自动选中（仍可切回「不绑定」本地预览）。
 const DEFAULT_BIND_APP = "production";
 let fileAppInitialized = false;
+let dictAppInitialized = false;
 $("#f_app").addEventListener("change", () => { fileAppInitialized = true; });
 async function loadAppsIntoSelectors() {
   const { apps } = await api("GET", "/admin/apps");
-  fillApps($("#dictApp"), apps);
+  const dictSel = $("#dictApp"), previousDict = dictSel.value;
+  fillApps(dictSel, apps);
+  dictSel.prepend(new Option("请选择要编辑的应用", ""));
+  dictSel.value = dictAppInitialized ? (apps.some((a) => a.app_id === previousDict) ? previousDict : "") : (apps.some((a) => a.app_id === "workbench") ? "workbench" : (apps[0] ? apps[0].app_id : ""));
+  dictAppInitialized = true;
   const fApp = $("#f_app");
   const prev = fApp.value;
   fillApps(fApp, apps);
@@ -672,33 +686,43 @@ async function loadAppsIntoSelectors() {
   const removed = fileAppInitialized && prev && !available.has(prev);
   fApp.value = fileAppInitialized
     ? (available.has(prev) ? prev : "")
-    : (available.has(DEFAULT_BIND_APP) ? DEFAULT_BIND_APP : "");
+    : (available.has("workbench") ? "workbench" : (available.has(DEFAULT_BIND_APP) ? DEFAULT_BIND_APP : ""));
   fileAppInitialized = true;
   $("#f_app_notice").textContent = removed ? "原绑定应用已不存在，已切换为仅本地预览。" : "";
   renderAppsTable(apps);
   wbFillApps(apps);
-  if (apps.length) { $("#dictApp").value = apps[0].app_id; await loadDict(); }
-  else { $("#dictArea").innerHTML = "<div class='empty'>未注册应用，去『应用 / 档位』标签添加。</div>"; }
+  $("#dictCurrent").textContent = "当前编辑：" + (dictSel.value || "尚未选择应用") + " 的词典";
+  if (dictSel.value) await loadDict();
+  else { $("#dictArea").innerHTML = "<div class='empty'>请选择要编辑的应用；未注册应用可到『应用 / 档位』添加。</div>"; }
+  if (typeof window !== "undefined") { window.__tuominRegisteredApps = apps; if (window.TuominShellUI) window.TuominShellUI.renderApps(apps); }
 }
 $("#dictApp").onchange = loadDict;
 async function loadDict() {
-  const appId = $("#dictApp").value; if (!appId) return;
+  const appId = $("#dictApp").value;
+  $("#dictCurrent").textContent = "当前编辑：" + (appId || "尚未选择应用") + " 的词典";
+  $("#dictAppMeta").textContent = "";
+  $("#dictArea").innerHTML = "<div class='empty'>" + (appId ? "正在读取所选词典…" : "请选择要编辑的应用。") + "</div>";
+  if (!appId) return;
   try {
     const { entry } = await api("GET", "/admin/apps/" + encodeURIComponent(appId));
+    if ($("#dictApp").value !== appId) return;
     const prof = entry.profile ? (typeof entry.profile === "string" ? entry.profile : "(inline)") : (entry.sensitivity || "strict");
-    $("#dictAppMeta").textContent = `档位/敏感级: ${prof}` + (entry.dictionary ? ` · 词典: ${entry.dictionary}` : " · 未配置词典");
+    $("#dictCurrent").textContent = "当前编辑：" + (entry.name || appId) + " 的词典";
+    $("#dictAppMeta").textContent = `档位：${prof}` + (entry.dictionary ? ` · 词典文件：${String(entry.dictionary).split("/").pop()}` : " · 未配置词典");
     const { entries } = await api("GET", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary");
-    if (!entries.length) { $("#dictArea").innerHTML = "<div class='empty'>暂无词条。用上方表单添加。</div>"; return; }
+    if ($("#dictApp").value !== appId) return;
+    if (!entries.length) { $("#dictArea").innerHTML = "<div class='empty'>还没有词条。在上方填写名称和类型后点「添加」。</div>"; return; }
     let h = "<table><thead><tr><th>规范值</th><th>标签</th><th>别名</th><th>风险</th><th></th></tr></thead><tbody>";
     for (const e of entries) {
       const al = (e.aliases || []).map((a) => `<span>${esc(a)}</span>`).join("") || '<span class="meta">—</span>';
       h += `<tr><td><b>${esc(e.canonical_value)}</b></td><td>${esc(e.label)}</td><td class="pills">${al}</td><td>${esc(e.risk_level||"")}</td><td><button class="btn danger" data-del="${esc(e.entry_id)}">删除</button></td></tr>`;
     }
     $("#dictArea").innerHTML = h + "</tbody></table>";
-    $$("#dictArea [data-del]").forEach((b) => b.onclick = () => delEntry(b.dataset.del));
-  } catch (e) { $("#dictArea").innerHTML = "<div class='empty'>" + esc(e.message) + "</div>"; }
+    $$("#dictArea [data-del]").forEach((b) => { b.disabled = !!window.__tuominDemo; b.onclick = () => delEntry(b.dataset.del); });
+  } catch (e) { if ($("#dictApp").value === appId) $("#dictArea").innerHTML = "<div class='empty'>" + esc(e.message) + "</div>"; }
 }
 async function addEntry() {
+  if (window.__tuominDemo) return toast("演示模式下词典只读");
   const appId = $("#dictApp").value; if (!appId) return toast("请先选应用");
   const canonical = $("#f_canonical").value.trim(), label = $("#f_label").value.trim();
   if (!canonical || !label) return toast("规范值和标签必填");
@@ -709,6 +733,7 @@ async function addEntry() {
   } catch (e) { toast("失败：" + e.message); }
 }
 async function delEntry(id) {
+  if (window.__tuominDemo) return toast("演示模式下词典只读");
   if (!confirm("删除该词条？")) return;
   try { await api("DELETE", "/admin/apps/" + encodeURIComponent($("#dictApp").value) + "/dictionary/" + encodeURIComponent(id)); toast("已删除"); loadDict(); }
   catch (e) { toast("失败：" + e.message); }
@@ -719,19 +744,19 @@ $("#reloadBtn").onclick = async () => { try { await api("POST", "/dict/reload");
 // --- apps tab ---
 function renderAppsTable(apps) {
   if (!apps.length) { $("#appsArea").innerHTML = "<div class='empty'>暂无应用。</div>"; return; }
-  let h = "<table><thead><tr><th>app_id</th><th>档位/敏感级</th><th>词典</th><th></th></tr></thead><tbody>";
+  let h = "<table><thead><tr><th>名称</th><th>标识</th><th>档位/敏感级</th><th>词典</th><th></th></tr></thead><tbody>";
   for (const a of apps) {
     const prof = a.profile ? (typeof a.profile === "string" ? a.profile : "(inline)") : (a.sensitivity || "strict");
-    h += `<tr><td><b>${esc(a.app_id)}</b></td><td>${esc(prof)}</td><td>${a.has_dictionary ? "✓" : "—"}</td><td><button class="btn danger" data-delapp="${esc(a.app_id)}">删除</button></td></tr>`;
+    h += `<tr><td><b>${esc(a.name || "—")}</b></td><td>${esc(a.app_id)}</td><td>${esc(prof)}</td><td>${a.has_dictionary ? "✓" : "—"}</td><td><button class="btn danger" data-delapp="${esc(a.app_id)}">删除</button></td></tr>`;
   }
   $("#appsArea").innerHTML = h + "</tbody></table>";
   $$("#appsArea [data-delapp]").forEach((b) => b.onclick = () => delApp(b.dataset.delapp));
 }
 async function saveApp() {
   const id = $("#a_id").value.trim(); if (!id) return toast("app_id 必填");
-  const entry = { sensitivity: $("#a_sens").value };
-  const dict = $("#a_dict").value.trim(); if (dict) entry.dictionary = dict;
-  try { await api("PUT", "/admin/apps/" + encodeURIComponent(id), entry); $("#a_id").value = $("#a_dict").value = ""; toast("已保存"); refreshAll(); }
+  const entry = { sensitivity: $("#a_sens").value, dictionary: "dictionaries/" + id + ".json" };
+  const name = $("#a_name").value.trim(); if (name) entry.name = name;
+  try { await api("PUT", "/admin/apps/" + encodeURIComponent(id), entry); $("#a_id").value = $("#a_name").value = ""; toast("已保存"); refreshAll(); }
   catch (e) { toast("失败：" + e.message); }
 }
 async function delApp(id) {
@@ -741,13 +766,129 @@ async function delApp(id) {
 }
 $("#a_save").onclick = saveApp;
 
+// --- 词典：批量导入 / 导出 / 从结果学习 ---
+const DI = { lastBody: null };
+const DI_STATUS = { added: "新增", updated: "合并别名", unchanged: "已存在", error: "错误", blocked: "未通过质量检查" };
+function diStatusLabel(status) { return DI_STATUS[status] || status; }
+function diRender(result) {
+  const c = result.counts || {};
+  $("#di_summary").textContent = (result.dry_run ? "预览：" : "已导入：") + Object.keys(DI_STATUS).filter((k) => c[k]).map((k) => diStatusLabel(k) + " " + c[k]).join("，") + (result.rows_truncated ? "（仅显示前 2000 行）" : "");
+  const rows = result.rows || [];
+  $("#di_rows").innerHTML = rows.length ? `<table><thead><tr><th>行</th><th>名称</th><th>类型</th><th>别名</th><th>结果</th><th>说明</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr class="di-${esc(r.status)}"><td>${r.line}</td><td>${esc(r.canonical_value)}</td><td>${esc(r.label)}</td><td class="pills">${(r.aliases || []).map((a) => "<span>" + esc(a) + "</span>").join("")}</td><td>${esc(diStatusLabel(r.status))}</td><td class="meta">${esc(r.message)}</td></tr>`).join("") +
+    `</tbody></table>` : "";
+}
+async function diBody() {
+  const source = $("#di_source").value, body = { default_label: $("#di_label").value };
+  if (source === "app") {
+    if (!$("#di_app").value) throw new Error("请选择来源应用");
+    return { ...body, format: "app", source_app: $("#di_app").value };
+  }
+  if (source === "file") {
+    const f = $("#di_file").files[0]; if (!f) throw new Error("请先选择文件");
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (ext === "xlsx") {
+      const bytes = new Uint8Array(await f.arrayBuffer()); let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      return { ...body, format: "xlsx", content_b64: btoa(bin) };
+    }
+    return { ...body, format: ext === "csv" ? "csv" : (ext === "json" ? "json" : "text"), content: await f.text() };
+  }
+  const text = $("#di_text").value; if (!text.trim()) throw new Error("请先粘贴要导入的词条");
+  return { ...body, format: "text", content: text };
+}
+async function diRun(commit) {
+  const appId = $("#dictApp").value; if (!appId) return toast("请先选择词典所属应用");
+  try {
+    const body = commit && DI.lastBody ? DI.lastBody : await diBody();
+    const r = await api("POST", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary/import", { ...body, dry_run: !commit });
+    diRender(r);
+    if (commit) { DI.lastBody = null; $("#di_commit").disabled = true; toast("已导入 " + r.changed + " 条"); loadDict(); }
+    else { DI.lastBody = body; $("#di_commit").disabled = !r.changed; if (!r.changed) toast("没有可导入的新词条"); }
+  } catch (e) { toast("失败：" + e.message); }
+}
+function diSourceChanged() {
+  const source = $("#di_source").value;
+  $("#di_text").hidden = source !== "text"; $("#di_file").hidden = source !== "file"; $("#di_app").hidden = source !== "app";
+  DI.lastBody = null; $("#di_commit").disabled = true;
+  if (source === "app") {
+    const current = $("#dictApp").value, sel = $("#di_app"); sel.innerHTML = "";
+    for (const o of Array.from($("#dictApp").options)) if (o.value && o.value !== current) sel.appendChild(new Option(o.textContent, o.value));
+  }
+}
+$("#di_source").onchange = diSourceChanged;
+for (const id of ["#di_text", "#di_file", "#di_label", "#di_app"]) $(id).addEventListener("input", () => { DI.lastBody = null; $("#di_commit").disabled = true; });
+$("#di_preview").onclick = () => diRun(false);
+$("#di_commit").onclick = () => diRun(true);
+async function dictExport(format) {
+  const appId = $("#dictApp").value; if (!appId) return toast("请先选择词典所属应用");
+  try { const r = await api("GET", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary/export?format=" + format); download(r.name, r.content, r.mime); }
+  catch (e) { toast("导出失败：" + e.message); }
+}
+$("#dict_export_csv").onclick = () => dictExport("csv");
+$("#dict_export_json").onclick = () => dictExport("json");
+const DL = { found: [] };
+function dlFillTasks(preferred) {
+  const sel = $("#dl_task"); if (!sel) return;
+  const previous = preferred || sel.value; sel.innerHTML = "";
+  for (const j of TASKS.list || []) sel.appendChild(new Option("文件 · " + taskLabel(j), j.task_id));
+  for (const a of TASKS.agents || []) sel.appendChild(new Option(agentSessionLabel(a), "agent:" + a.namespace_id));
+  if (!sel.options.length) sel.appendChild(new Option("（还没有脱敏任务）", ""));
+  if (Array.from(sel.options).some((o) => o.value === previous)) sel.value = previous;
+}
+async function dlFind() {
+  const task = $("#dl_task").value, appId = $("#dictApp").value;
+  if (!task) return toast("请选择一次脱敏结果"); if (!appId) return toast("请先选择词典所属应用");
+  try {
+    const r = await api("GET", "/api/v1/documents/dictionary-candidates?task_id=" + encodeURIComponent(task) + "&app_id=" + encodeURIComponent(appId));
+    DL.found = r.candidates || [];
+    $("#dl_msg").textContent = DL.found.length ? "找到 " + DL.found.length + " 个词典里还没有的名称" : "没有发现新的名称";
+    $("#dl_rows").innerHTML = DL.found.length ? `<table><thead><tr><th><input type="checkbox" id="dl_all" checked /></th><th>名称</th><th>类型</th></tr></thead><tbody>` +
+      DL.found.map((c, i) => `<tr><td><input type="checkbox" data-dl="${i}" checked /></td><td>${esc(c.canonical_value)}</td><td><select data-dl-label="${i}">${["ORG","PERSON","ADDRESS","PROJECT","SUPPLIER","CUSTOMER"].map((l) => `<option${l === c.label ? " selected" : ""}>${l}</option>`).join("")}</select></td></tr>`).join("") + `</tbody></table>` : "";
+    $("#dl_add").disabled = !DL.found.length;
+    const all = $("#dl_all"); if (all) all.onchange = () => $$("#dl_rows [data-dl]").forEach((b) => { b.checked = all.checked; });
+  } catch (e) { toast("失败：" + e.message); }
+}
+async function dlAdd() {
+  const appId = $("#dictApp").value;
+  const entries = [];
+  $$("#dl_rows [data-dl]").forEach((box) => { if (box.checked) { const i = Number(box.dataset.dl); entries.push({ canonical_value: DL.found[i].canonical_value, label: $(`[data-dl-label="${i}"]`).value }); } });
+  if (!entries.length) return toast("请至少勾选一项");
+  try {
+    const r = await api("POST", "/admin/apps/" + encodeURIComponent(appId) + "/dictionary/import", { format: "json", content: JSON.stringify(entries), dry_run: false });
+    diRender(r); toast("已加入 " + r.changed + " 条"); $("#dl_rows").innerHTML = ""; $("#dl_add").disabled = true; $("#dl_msg").textContent = ""; loadDict();
+  } catch (e) { toast("失败：" + e.message); }
+}
+$("#dl_find").onclick = dlFind;
+$("#dl_add").onclick = dlAdd;
+$$("#tabs button").forEach((b) => b.addEventListener("click", () => { if (b.dataset.tab === "dict") loadTaskOptions().then(() => dlFillTasks()).catch(() => {}); }));
+$("#f_learn").onclick = async () => {
+  if (!WB.taskId) return;
+  const target = $("#f_app").value; const learnTask = WB.taskId;
+  if (window.TuominShellUI) window.TuominShellUI.showTab("dict"); else { const t = $('#tabs button[data-tab="dict"]'); if (t) t.click(); }
+  if (target && Array.from($("#dictApp").options).some((o) => o.value === target)) { $("#dictApp").value = target; $("#dictApp").dispatchEvent(new Event("change")); }
+  await loadTaskOptions(learnTask).catch(() => {}); dlFillTasks(learnTask); dlFind();
+  $("#dictLearnCard").scrollIntoView({ block: "start" });
+};
 // --- WorkBuddy 接入向导 ---
-function wbFillApps(apps) {
+async function wbFillApps(apps) {
   const sel = $("#w_app"); if (!sel) return;
-  const prev = sel.value, ids = apps.map((a) => a.app_id);
+  const prev = sel.value;
+  // Only apps with an upstream model can back a WorkBuddy custom model; the
+  // file / clipboard workbench apps would make the gateway answer 502 on every chat.
+  let chat = null;
+  try { chat = new Set((await api("GET", "/admin/integrations/workbuddy")).chat_apps || []); } catch (e) { chat = null; }
   sel.innerHTML = "";
-  for (const id of ids) sel.appendChild(new Option(id, id));
-  if (ids.includes(prev)) sel.value = prev;
+  const ready = [];
+  for (const a of apps) {
+    const id = a.app_id, ok = chat ? chat.has(id) : true;
+    const opt = new Option(ok ? id : id + "（无上游模型，不可接入）", id);
+    if (!ok) opt.disabled = true; else ready.push(id);
+    sel.appendChild(opt);
+  }
+  if (!ready.length) { const hint = new Option("（没有可接入的应用，请先在下面一键创建）", ""); sel.prepend(hint); }
+  sel.value = ready.includes(prev) ? prev : (ready[0] || "");
+  if (chat && !ready.length) wbMsg("还没有配置上游模型的应用：文件 / 剪贴板工作台的应用不能接入 WorkBuddy。请先用下面「一键创建」新建一个项目应用。", true);
 }
 function wbMsg(msg, isErr) { const el = $("#w_msg"); el.textContent = msg || ""; el.style.color = isErr ? "var(--danger)" : ""; }
 function wbRenderResult(plan) {
@@ -766,7 +907,7 @@ function wbRenderResult(plan) {
 }
 async function wbPlan() {
   const app = $("#w_app").value;
-  if (!app) { $("#w_gateway").textContent = ""; wbMsg("还没有项目 app，用下面「一键创建」。", true); wbRenderResult({}); return; }
+  if (!app) { $("#w_gateway").textContent = ""; wbMsg("还没有可接入的项目应用，用下面「一键创建」新建一个（需要上游模型地址与 API key）。", true); wbRenderResult({}); return; }
   wbMsg("探测中…");
   try {
     const data = await api("GET", "/admin/integrations/workbuddy?app_id=" + encodeURIComponent(app));
@@ -801,10 +942,10 @@ async function wbApply() {
   try {
     const r = await api("POST", "/admin/integrations/workbuddy/apply", { app_id: app, api_key: key });
     $("#w_key").value = "";   // never keep the key in the DOM
-    wbMsg("已写入 ✓");
+    wbMsg("配置已写入，请到 WorkBuddy 确认模型是否出现。");
     $("#w_gateway").innerHTML = `网关：<b>${esc(r.gateway_url)}</b>`;
     $("#w_result").innerHTML =
-      `<div class='meta'>写入 <b>${r.written_entries}</b> 条，自愈旧端口 <b>${r.retargeted_entries}</b> 条，共 ${r.models_total} 条；文件：<code>${esc(r.models_file)}</code>` +
+      `<div class='meta'>写入 <b>${r.written_entries}</b> 条，自愈旧端口 <b>${r.retargeted_entries}</b> 条` + (r.pruned_entries ? `，移除指向无上游应用的旧条目 <b>${r.pruned_entries}</b> 条` : "") + `，共 ${r.models_total} 条；文件：<code>${esc(r.models_file)}</code>` +
       (r.backup ? `<br>备份：<code>${esc(r.backup)}</code>` : "") +
       `<br>去 WorkBuddy 模型下拉选：<b>${r.model_names.map(esc).join("</b> / <b>")}</b></div>`;
   } catch (e) { wbMsg("失败：" + e.message, true); }
@@ -814,17 +955,105 @@ async function wbVerify() {
   if (!app) return toast("请先选项目 app");
   try {
     const r = await api("POST", "/admin/integrations/workbuddy/verify", { app_id: app });
-    let h = `<div class='meta'>校验：<b>${r.ok ? "通过 ✓" : "未通过"}</b> · 网关 ${esc(r.gateway_url || "无")} · app 已挂载 ${r.gateway_serves_app ? "✓" : "✗"}</div>`;
+    let h = `<div class='meta'>本地配置检查：<b>${r.ok ? "通过 ✓" : "未通过"}</b> · 网关 ${esc(r.gateway_url || "无")} · app 已挂载 ${r.gateway_serves_app ? "✓" : "✗"} · 上游模型 ${r.upstream_configured === false ? "<span style='color:var(--danger)'>未配置（对话会被 502 拒绝）</span>" : "已配置 ✓"}</div>`;
+    if ((r.invalid_entries || []).length) h += `<div class='meta' style='color:var(--danger)'>有 ${r.invalid_entries.length} 条配置格式不兼容，重新点「生成并写入」即可修正。</div>`;
     if ((r.entries || []).length) {
-      h += "<table><thead><tr><th>模式</th><th>条目</th><th>指向网关</th></tr></thead><tbody>";
-      for (const e of r.entries) h += `<tr><td>${esc(e.mode)}</td><td>${esc(e.id || "")}</td><td>${e.points_at_gateway ? "✓" : "✗"}</td></tr>`;
+      h += "<table><thead><tr><th>模式</th><th>条目</th><th>指向网关</th><th>配置格式</th></tr></thead><tbody>";
+      for (const e of r.entries) h += `<tr><td>${esc(e.mode)}</td><td>${esc(e.id || "")}</td><td>${e.points_at_gateway ? "✓" : "✗"}</td><td>${e.format_valid ? "✓" : esc((e.format_errors || []).join("；"))}</td></tr>`;
       h += "</tbody></table>";
     }
     h += `<div class='meta' style='margin-top:6px'>${esc(r.note || "")}</div>`;
     $("#w_result").innerHTML = h;
-    wbMsg(r.ok ? "校验通过" : "存在未指向当前网关的旧条目，重新点『生成并写入』即可自愈。", !r.ok);
+    wbMsg(r.ok ? "本地配置检查通过；WorkBuddy 加载情况仍需在模型列表中确认。" : (r.issues || []).join(" "), !r.ok);
   } catch (e) { wbMsg("失败：" + e.message, true); }
 }
+// --- AI 工具一键接入（MCP + Skill）---
+const AG = { data: null, busy: false };
+function agentCommandLine(mcp) { return [mcp.command, ...(mcp.args || [])].map((p) => /\s/.test(p) ? '"' + p + '"' : p).join(" "); }
+function agentStatusText(c) {
+  if (c.installed && c.current) return "<span class='ok'>已接入</span>";
+  if (c.installed) return "<span class='warn'>已接入，但指向旧位置，点「写入」更新</span>";
+  return c.detected ? "未接入" : "<span class='meta'>未检测到该客户端</span>";
+}
+function agentRender() {
+  const d = AG.data; if (!d) return;
+  const demo = !!window.__tuominDemo;
+  const sel = $("#agentSource"); sel.innerHTML = "";
+  sel.appendChild(new Option("不使用词典（仅规则与模型识别）", ""));
+  for (const s of d.sources || []) sel.appendChild(new Option(s.name + "（" + s.app_id + "）", s.app_id));
+  sel.value = d.app.dictionary_source || "";
+  $("#mcpCommand").textContent = agentCommandLine(d.mcp);
+  $("#agentCommandWarn").textContent = d.mcp.warning || (d.app.configured ? "" : "智能体应用尚未配置，第一次写入或自检时会自动创建。");
+  $("#agentClients").innerHTML = (d.clients || []).map((c) =>
+    `<div class="agent-client"><div><b>${esc(c.name)}</b> · ${agentStatusText(c)}` +
+    (c.skill_supported ? ` · skill ${c.skill_installed ? "已安装" : "未安装"}` : "") +
+    `<div class="meta">${esc(c.config_path)}</div>` +
+    (c.skill_note ? `<div class="meta">${esc(c.skill_note)}</div>` : "") +
+    (c.installed && (c.notes || []).length ? `<div class="meta">${esc(c.notes[0])}</div>` : "") + `</div>` +
+    `<div class="agent-actions">` +
+    (c.skill_supported ? `<label class="ck meta"><input type="checkbox" data-agent-skill="${esc(c.id)}" checked ${demo ? "disabled" : ""}/>同时安装 skill</label>` : "") +
+    `<button class="btn sm" data-agent-install="${esc(c.id)}" ${demo ? "disabled" : ""}>${c.installed ? "重新写入" : "写入"}</button>` +
+    (c.installed ? `<button class="btn ghost sm" data-agent-remove="${esc(c.id)}" ${demo ? "disabled" : ""}>移除</button>` : "") +
+    `<button class="btn ghost sm" data-agent-copy="${esc(c.id)}">复制配置</button></div></div>`).join("");
+  $$("#agentClients [data-agent-install]").forEach((b) => b.onclick = () => agentInstall(b.dataset.agentInstall));
+  $$("#agentClients [data-agent-remove]").forEach((b) => b.onclick = () => agentRemove(b.dataset.agentRemove));
+  $$("#agentClients [data-agent-copy]").forEach((b) => b.onclick = () => agentCopy(b.dataset.agentCopy));
+  for (const id of ["#agentSaveSource", "#agentRotate"]) $(id).disabled = demo;
+}
+async function agentLoad() {
+  try { AG.data = await api("GET", "/admin/agents"); agentRender(); }
+  catch (e) { $("#agentClients").innerHTML = `<div class="empty">${esc("读取失败：" + e.message)}</div>`; }
+}
+async function agentInstall(id) {
+  if (AG.busy) return; AG.busy = true;
+  const skillBox = $(`[data-agent-skill="${id}"]`);
+  try {
+    const r = await api("POST", "/admin/agents/" + encodeURIComponent(id) + "/install", { with_skill: skillBox ? skillBox.checked : false });
+    toast(r.name + " 已写入");
+    const notes = [r.warning, r.note, r.skill_note, ...(r.status && r.status.notes || [])].filter(Boolean);
+    $("#agentSelftestOut").innerHTML = `<div class="meta" style="margin-top:10px">已写入 <code>${esc(r.config_path || "")}</code>` + (r.backup ? `，原配置备份为 <code>${esc(r.backup)}</code>` : "") + (r.skill_path && r.skill_written ? `；skill 已安装到 <code>${esc(r.skill_path)}</code>` : "") + `。${notes.map(esc).join(" ")}</div>`;
+    await agentLoad();
+  } catch (e) { toast("写入失败：" + e.message); }
+  finally { AG.busy = false; }
+}
+async function agentRemove(id) {
+  if (!confirm("从该客户端移除 Tuomin？只删除 tuomin 这一项和 Tuomin 写入的 skill，其他配置不动。")) return;
+  try { await api("POST", "/admin/agents/" + encodeURIComponent(id) + "/uninstall"); toast("已移除"); await agentLoad(); }
+  catch (e) { toast("移除失败：" + e.message); }
+}
+async function agentCopy(id) {
+  try {
+    const { snippet } = await api("GET", "/admin/agents/" + encodeURIComponent(id) + "/snippet");
+    await navigator.clipboard.writeText(snippet); toast("配置已复制");
+  } catch (e) { toast("复制失败：" + e.message); }
+}
+async function agentSelftest() {
+  const out = $("#agentSelftestOut"); out.innerHTML = '<div class="meta" style="margin-top:10px">自检中：正在按客户端的方式启动 MCP 命令…</div>';
+  $("#agentSelftest").disabled = true;
+  try {
+    const r = await api("POST", "/admin/agents/selftest", {});
+    out.innerHTML = `<table style="margin-top:10px"><thead><tr><th>步骤</th><th>结果</th><th>说明</th><th>耗时</th></tr></thead><tbody>` +
+      r.steps.map((s) => `<tr><td>${esc(s.step)}</td><td>${s.ok ? "✓" : "✗"}</td><td class="meta">${esc(s.detail)}</td><td class="meta">${s.ms}ms</td></tr>`).join("") +
+      `</tbody></table><div class="meta">${r.ok ? "自检通过：已接入的客户端重启后即可调用 Tuomin。" : "自检未通过：按失败步骤的说明处理后重试。"}</div>`;
+    await agentLoad();
+  } catch (e) { out.innerHTML = `<div class="blocked-note" style="margin-top:10px">${esc("自检失败：" + e.message)}</div>`; }
+  finally { $("#agentSelftest").disabled = false; }
+}
+$("#agentSelftest").onclick = agentSelftest;
+$("#agentSaveSource").onclick = async () => {
+  try { await api("POST", "/admin/agents/setup", { dictionary_source: $("#agentSource").value }); toast("智能体词典已更新"); await agentLoad(); }
+  catch (e) { toast("失败：" + e.message); }
+};
+$("#agentRotate").onclick = async () => {
+  if (!confirm("更换智能体凭证？已接入的客户端无需改动。")) return;
+  try { const r = await api("POST", "/admin/agents/rotate"); toast(r.note || "已更换"); await agentLoad(); }
+  catch (e) { toast("失败：" + e.message); }
+};
+$("#agentSkillZip").onclick = async () => {
+  try { const r = await api("GET", "/admin/agents/skill.zip"); downloadB64(r.name, r.b64, "application/zip"); }
+  catch (e) { toast("下载失败：" + e.message); }
+};
+$$("#tabs button").forEach((b) => b.addEventListener("click", () => { if (b.dataset.tab === "onboard") agentLoad(); }));
 $("#w_status").onclick = wbPlan;
 $("#w_app").onchange = wbPlan;
 $("#w_create").onclick = wbCreate;
@@ -970,32 +1199,101 @@ async function runRedact() {
 $("#t_run").onclick = runRedact;
 
 // --- workbench: file redaction & refill ---
+// 保存产物：原生窗口里走系统「存储为」面板（用户选位置），浏览器里走普通下载。
+function shellSaver() {
+  if (typeof window === "undefined" || !window.__tuominShell) return null;
+  return window.pywebview && window.pywebview.api && window.pywebview.api.save_file ? window.pywebview.api : null;
+}
+function showSaved(path) {
+  const bar = $("#saveBar"); if (!bar) { toast("已保存：" + path); return; }
+  bar.hidden = false; bar.dataset.path = path;
+  $("#saveBarText").textContent = "已保存到 " + path;
+}
+function saveBlob(name, blob) {
+  const api = shellSaver();
+  if (!api) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const b64 = String(reader.result).split(",")[1] || "";
+    try {
+      const result = await api.save_file(name, b64);
+      if (result && result.path) showSaved(result.path);
+      else if (!(result && result.cancelled)) toast("保存失败，请重试");
+    } catch (e) { toast("保存失败：" + (e && e.message ? e.message : "请重试")); }
+  };
+  reader.onerror = () => toast("保存失败，无法读取生成的文件");
+  reader.readAsDataURL(blob);
+}
 function download(name, content, type) {
-  const blob = new Blob([content], { type: type || "application/octet-stream" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  saveBlob(name, new Blob([content], { type: type || "application/octet-stream" }));
 }
 function baseName(n) { return (n || "document").replace(/\.[^.]*$/, ""); }
 function downloadB64(name, b64, type) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const blob = new Blob([bytes], { type: type || "application/octet-stream" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  saveBlob(name, new Blob([bytes], { type: type || "application/octet-stream" }));
 }
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+if ($("#saveBarReveal")) $("#saveBarReveal").onclick = async () => {
+  const api = shellSaver(), path = $("#saveBar").dataset.path;
+  if (!api || !api.reveal_file || !path) return;
+  try { await api.reveal_file(path); } catch (e) { toast(e && e.message ? e.message : "无法显示"); }
+};
+if ($("#saveBarClose")) $("#saveBarClose").onclick = () => { $("#saveBar").hidden = true; };
+const OFFICE_MIMES = {
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+// 旧版二进制格式先由服务端转换（LibreOffice / macOS textutil），再走对应的原格式链路；产物是新格式。
+const LEGACY_FORMATS = { doc: "docx", xls: "xlsx" };
+function officeFormat(name) {
+  const extension = (name || "").split(".").pop().toLowerCase();
+  if (Object.hasOwn(OFFICE_MIMES, extension)) return extension;
+  return Object.hasOwn(LEGACY_FORMATS, extension) ? LEGACY_FORMATS[extension] : null;
+}
+function legacyExtension(name) {
+  const extension = (name || "").split(".").pop().toLowerCase();
+  return Object.hasOwn(LEGACY_FORMATS, extension) ? extension : null;
+}
 const WB = { taskId: null, base: "document", redacted: "", manifest: null };
+// --- 可终止的长任务：请求带 X-Tuomin-Request-Id，终止时通知服务端停止并中断本地等待 ---
+const RUN = { controller: null, requestId: null };
+function beginCancellable() {
+  RUN.requestId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, "") : "r" + Date.now();
+  RUN.controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  const cancel = $("#f_cancel"); if (cancel) { cancel.hidden = false; cancel.disabled = false; }
+  const progress = $("#f_progress"); if (progress) progress.textContent = "处理中，大文件可能需要几分钟…";
+  return { headers: { "x-tuomin-request-id": RUN.requestId }, signal: RUN.controller ? RUN.controller.signal : undefined };
+}
+function endCancellable() {
+  RUN.controller = null; RUN.requestId = null;
+  const cancel = $("#f_cancel"); if (cancel) cancel.hidden = true;
+  const progress = $("#f_progress"); if (progress) progress.textContent = "";
+}
+async function cancelRunning() {
+  const id = RUN.requestId; if (!id) return;
+  $("#f_cancel").disabled = true; $("#f_progress").textContent = "正在终止…";
+  try { await api("POST", "/api/v1/documents/cancel", { request_id: id }); } catch { /* 服务端不可达时仅中断本地等待 */ }
+  if (RUN.controller) RUN.controller.abort();
+}
+if ($("#f_cancel")) $("#f_cancel").onclick = cancelRunning;
+function isAbort(e) { return !!e && (e.name === "AbortError" || e.cancelled === true); }
+function cancelledError() { const e = new Error("已终止"); e.cancelled = true; return e; }
 
 function resetFileResult() {
   WB.taskId = null; WB.redacted = ""; WB.manifest = null;
   for (const id of ["#f_egress", "#f_meta", "#f_warn"]) $(id).innerHTML = "";
   $("#f_out").textContent = "正在脱敏，请稍候…";
-  for (const id of ["#f_dl_md", "#f_dl_manifest", "#f_pkg"]) $(id).disabled = true;
+  for (const id of ["#f_dl_md", "#f_dl_manifest", "#f_pkg", "#f_dl_office"]) $(id).disabled = true;
+  $("#f_dl_office").hidden = true; WB.office = null;
+  if ($("#f_learn")) $("#f_learn").hidden = true;
 }
 
 function renderEgress(eg) {
@@ -1026,6 +1324,7 @@ $("#f_run").onclick = async () => {
   const file = $("#f_file").files[0]; if (!file) return toast("请先选择文件");
   const btn = $("#f_run"); btn.disabled = true; btn.textContent = "处理中…";
   resetFileResult();
+  const run = beginCancellable();
   try {
     const buf = await file.arrayBuffer();
     const appId = $("#f_app").value;
@@ -1033,21 +1332,23 @@ $("#f_run").onclick = async () => {
       (appId ? "&app_id=" + encodeURIComponent(appId) : "");
     const r = await fetch(url, {
       method: "POST",
-      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-      body: buf,
+      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui", ...run.headers },
+      body: buf, signal: run.signal,
     });
     const data = await r.json().catch(() => ({}));
-    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
-    if (!r.ok) throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
-    WB.taskId = data.task_id; WB.base = baseName(file.name);
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
+    if (r.status === 409 && data.status === "cancelled") throw cancelledError();
+    if (!r.ok) throw new Error(explainError(data, r.status));
+    WB.taskId = data.task_id; if (typeof loadTaskOptions === "function") loadTaskOptions(WB.taskId).catch(() => {}); WB.base = baseName(file.name);
+    if ($("#f_learn")) $("#f_learn").hidden = !data.task_id;
     WB.redacted = data.redacted_markdown; WB.manifest = data.manifest;
     $("#f_out").textContent = WB.redacted;
     const lc = data.label_counts || {};
     $("#f_meta").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">文件 <b>${esc(data.file_name)}</b></span><span class="k">格式 <b>${esc(data.file_format)}</b></span><span class="k">task <b>${esc(data.task_id)}</b></span>` +
       Object.keys(lc).map((k) => `<span class="k">${esc(k)} <b>${lc[k]}</b></span>`).join("") + `</div>`;
-    const warns = data.warnings || [];
+    const warns = (data.warnings || []).map(warningText).filter(Boolean);
     $("#f_warn").innerHTML = warns.length
-      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map((w) => esc(w.code + "：" + w.message)).join("<br>")}</div>`
+      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map(esc).join("<br>")}</div>`
       : "";
     renderEgress(data.egress);
     const canEgress = !!(data.egress && data.egress.egress_allowed);
@@ -1056,13 +1357,17 @@ $("#f_run").onclick = async () => {
     $("#f_pkg").disabled = false;
     toast(canEgress ? "脱敏完成，出站闸门通过" : "脱敏完成：仅本地预览，出站被阻断");
   } catch (e) {
-    $("#f_out").textContent = "本次脱敏失败，未生成可用结果。";
-    $("#f_warn").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
-    toast("失败：" + e.message);
+    if (isAbort(e)) { $("#f_out").textContent = "已终止。本次没有生成任何结果。"; $("#f_warn").innerHTML = ""; toast("已终止"); }
+    else {
+      $("#f_out").textContent = "本次脱敏失败，未生成可用结果。";
+      $("#f_warn").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
+      toast("失败：" + e.message);
+    }
   }
-  finally { btn.disabled = false; btn.textContent = "▶ 解析并脱敏"; }
+  finally { endCancellable(); btn.disabled = false; btn.textContent = "解析并脱敏"; }
 };
 $("#f_dl_md").onclick = () => download(WB.base + ".redacted.md", WB.redacted, "text/markdown");
+$("#f_dl_office").onclick = () => { if (WB.office) downloadB64(WB.office.name, WB.office.b64, WB.office.mime); };
 $("#f_dl_manifest").onclick = () => download(WB.base + ".manifest.json", JSON.stringify(WB.manifest, null, 2), "application/json");
 $("#f_pkg").onclick = async () => {
   if (!WB.taskId) return toast("请先完成一次文件脱敏");
@@ -1074,93 +1379,193 @@ $("#f_pkg").onclick = async () => {
   } catch (e) { toast("失败：" + e.message); }
 };
 
-// DOCX 原格式脱敏：选定 .docx 时显示入口
-$("#f_file").onchange = () => {
+// 原格式脱敏：DOCX 沿用既有接口，XLSX/PPTX 使用 Office 接口。
+function updateOfficeButton() {
   const f = $("#f_file").files[0];
-  $("#f_run_docx").style.display = f && /\.docx$/i.test(f.name) ? "" : "none";
-};
-async function runDocxRedact(oleStrip) {
+  const format = f && officeFormat(f.name);
+  const legacy = f && legacyExtension(f.name);
+  $("#f_run_docx").style.display = format ? "" : "none";
+  $("#f_run_docx").textContent = !format ? "导出原格式脱敏文件"
+    : legacy ? "原格式脱敏（" + legacy.toUpperCase() + " → " + format.toUpperCase() + "）"
+    : "导出原格式脱敏文件（" + format.toUpperCase() + "）";
+}
+$("#f_file").onchange = updateOfficeButton;
+async function runOfficeRedact(oleStrip) {
   const file = $("#f_file").files[0]; if (!file) return toast("请先选择文件");
+  const format = officeFormat(file.name);
+  if (!format) return toast("原格式脱敏支持 DOCX、XLSX、PPTX，以及可转换的 DOC、XLS");
+  oleStrip = format === "docx" && oleStrip === true;
   const btn = $("#f_run_docx"); btn.disabled = true; btn.textContent = "处理中…";
   resetFileResult();
+  const run = beginCancellable();
   try {
     const buf = await file.arrayBuffer();
     const appId = $("#f_app").value;
-    const url = "/api/v1/documents/redact-docx?filename=" + encodeURIComponent(file.name) +
+    const url = "/api/v1/documents/redact-" + (format === "docx" ? "docx" : "office") + "?filename=" + encodeURIComponent(file.name) +
       (appId ? "&app_id=" + encodeURIComponent(appId) : "") +
       (oleStrip ? "&ole_strip=true" : "");
     const r = await fetch(url, {
       method: "POST",
-      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-      body: buf,
+      headers: { "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui", ...run.headers },
+      body: buf, signal: run.signal,
     });
     const data = await r.json().catch(() => ({}));
-    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
-    if (!r.ok && !oleStrip && data.error && data.error.code === "ole_object_present") {
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
+    if (r.status === 409 && data.status === "cancelled") throw cancelledError();
+    if (!r.ok && format === "docx" && !oleStrip && data.error && data.error.code === "ole_object_present") {
       $("#f_out").textContent = "本次脱敏被阻断，未生成可用结果。";
       // OLE 嵌入对象（WPS 公式等二进制黑盒）：fail-closed 拦截，给两条出路
       $("#f_warn").innerHTML =
         `<div class="blocked-note">文档包含 OLE 嵌入对象（如 WPS 公式、嵌入表格），其二进制内容无法脱敏，已安全拦截。<br>` +
-        `处理方式：① 在 WPS/Word 中把嵌入对象转换为图片后重试；② ` +
+        `可在 WPS/Word 中移除或改为可编辑文字后重试，也可 ` +
         `<button class="btn ghost sm" id="f_ole_retry" style="margin:4px 0">移除嵌入对象后继续（正文脱敏不受影响）</button></div>`;
-      $("#f_ole_retry").onclick = () => { $("#f_warn").innerHTML = ""; runDocxRedact(true); };
+      $("#f_ole_retry").onclick = () => { $("#f_warn").innerHTML = ""; return runOfficeRedact(true); };
       return;
     }
     if (!r.ok) {
       if (data.egress) renderEgress(data.egress);
-      throw new Error((data.error && data.error.message) || data.detail || ("HTTP " + r.status));
+      throw new Error(explainError(data, r.status));
     }
-    WB.taskId = data.task_id; WB.base = baseName(file.name);
-    WB.redacted = ""; WB.manifest = null;
     renderEgress(data.egress);
-    downloadB64(WB.base + ".redacted.docx", data.redacted_docx_b64, DOCX_MIME);
+    if (!data.egress || !data.egress.egress_allowed) throw new Error("出站闸门未通过，未下载原格式文件。");
+    const redactedB64 = format === "docx" ? data.redacted_docx_b64 : data.redacted_office_b64;
+    if (data.file_format !== format || typeof redactedB64 !== "string") throw new Error("脱敏结果格式不匹配，请重新处理。");
+    WB.taskId = data.task_id; if (typeof loadTaskOptions === "function") loadTaskOptions(WB.taskId).catch(() => {}); WB.base = baseName(file.name);
+    if ($("#f_learn")) $("#f_learn").hidden = !data.task_id;
+    WB.redacted = ""; WB.manifest = null;
+    WB.office = { name: WB.base + ".redacted." + format, b64: redactedB64, mime: OFFICE_MIMES[format] };
+    $("#f_dl_office").hidden = false; $("#f_dl_office").disabled = false;
+    downloadB64(WB.office.name, WB.office.b64, WB.office.mime);
     $("#f_meta").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">文件 <b>${esc(data.file_name)}</b></span><span class="k">task <b>${esc(data.task_id)}</b></span></div>`;
-    const warns = data.warnings || [];
+    const warns = (data.warnings || []).map(warningText).filter(Boolean);
     $("#f_warn").innerHTML = warns.length
-      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map((w) => esc(w.code + "：" + w.message)).join("<br>")}</div>`
+      ? `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ ${warns.map(esc).join("<br>")}</div>`
       : "";
-    $("#f_out").innerHTML = '<span class="empty">原格式脱敏完成，脱敏 DOCX 已下载。本页预览请使用「解析并脱敏」（Markdown 路径）。</span>';
+    $("#f_out").innerHTML = '<span class="empty">原格式脱敏完成。如果刚才没有保存，点「保存脱敏文件…」可以再次选择位置保存。</span>';
     $("#f_dl_md").disabled = true; $("#f_dl_manifest").disabled = true; $("#f_pkg").disabled = false;
-    toast("原格式脱敏完成，已下载 .redacted.docx");
+    toast("原格式脱敏完成");
   } catch (e) {
+    if (isAbort(e)) { $("#f_out").textContent = "已终止。本次没有生成任何结果。"; $("#f_warn").innerHTML = ""; toast("已终止"); return; }
     $("#f_out").textContent = "本次脱敏失败，未生成可用结果。";
     $("#f_warn").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
     toast("失败：" + e.message);
-  }
-  finally { btn.disabled = false; btn.textContent = "▶ 原格式脱敏（DOCX）"; }
+  } finally { endCancellable(); btn.disabled = false; updateOfficeButton(); }
 }
-$("#f_run_docx").onclick = () => runDocxRedact(false);
+$("#f_run_docx").onclick = () => runOfficeRedact(false);
 
-// DOCX 原格式回填
-$("#r_docx_run").onclick = async () => {
-  const f = $("#r_docx").files[0]; if (!f) return toast("请先选择脱敏 DOCX");
-  if (!RF.pkg) return toast("请先选择恢复包");
-  const pass = $("#r_pass").value; if (!pass) return toast("请输入恢复包口令");
+// 原格式回填：使用上传文件类型匹配接口及产物类型。
+async function runOfficeRefill(confirmEdited = false) {
+  const f = $("#r_docx").files[0]; if (!f) return toast("请先选择原格式脱敏文件");
+  const format = officeFormat(f.name);
+  if (!format) return toast("原格式回填仅支持 DOCX、XLSX、PPTX");
+  const recoveryPackage = RF.pkg;
+  const task = recoveryPackage ? "" : selectedTask("#r_task");
+  if (!recoveryPackage && !task) return toast("请选择脱敏时的任务，或改用恢复包");
+  const pass = $("#r_pass").value;
+  if (recoveryPackage && !pass) return toast("请输入恢复包口令");
+  const btn = $("#r_docx_run"); btn.disabled = true; btn.textContent = "处理中…";
+  $("#r_diff").innerHTML = "";
   try {
     const buf = await f.arrayBuffer();
     let binary = "";
     const bytes = new Uint8Array(buf);
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    const r = await fetch("/api/v1/documents/refill-docx", {
+    const payload = recoveryPackage ? { package: recoveryPackage, passphrase: pass } : { file_format: format, confirm_edited: confirmEdited === true };
+    if (format === "docx") payload.redacted_docx_b64 = btoa(binary);
+    else {
+      payload.file_format = format;
+      payload.redacted_office_b64 = btoa(binary);
+      payload.confirm_edited = confirmEdited === true;
+    }
+    const url = recoveryPackage
+      ? "/api/v1/documents/refill-" + (format === "docx" ? "docx" : "office")
+      : "/api/v1/documents/" + encodeURIComponent(task) + "/refill-office";
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-      body: JSON.stringify({ package: RF.pkg, passphrase: pass, redacted_docx_b64: btoa(binary) }),
+      body: JSON.stringify(payload),
     });
     const data = await r.json().catch(() => ({}));
-    if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+    if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
     if (data.status === "blocked" || !r.ok) {
-      const types = (data.error_types || []).map(esc).join("、");
-      const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+      const msg = explainError(data, r.status);
       $("#r_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>`;
       return;
     }
+    if (format !== "docx" && data.status === "needs_confirmation") {
+      $("#r_diff").innerHTML =
+        `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 文件已编辑，或与所选任务（恢复包）不对应；请确认属于同一任务，选错会还原成错误的原值。</div>` +
+        renderDiffLists(data.diff || {}) +
+        `<button class="btn sm" id="r_office_confirm" style="margin-top:10px">已确认属于同一任务，继续回填</button>`;
+      $("#r_office_confirm").onclick = () => {
+        if ($("#r_docx").files[0] !== f || RF.pkg !== recoveryPackage) {
+          $("#r_diff").textContent = "文件或任务已更换，请重新点击「原格式回填」校验。";
+          return;
+        }
+        return runOfficeRefill(true);
+      };
+      return;
+    }
     const base = baseName(f.name).replace(/\.redacted$/, "");
-    downloadB64(base + ".restored.docx", data.restored_docx_b64, DOCX_MIME);
+    const restoredB64 = format === "docx" ? data.restored_docx_b64 : data.restored_office_b64;
+    if (typeof restoredB64 !== "string") throw new Error("未收到可用的回填文件，请重新处理。");
+    RF.office = { name: base + ".restored." + format, b64: restoredB64, mime: OFFICE_MIMES[format] };
+    $("#r_dl_office").hidden = false; $("#r_dl_office").disabled = false;
+    downloadB64(RF.office.name, RF.office.b64, RF.office.mime);
     $("#r_diff").innerHTML = `<div class="kv" style="margin-top:12px"><span class="k">模式 <b>${esc(data.mode === "exact" ? "未编辑" : "已经过编辑/重存")}</b></span><span class="k">恢复条数 <b>${data.restored_count}</b></span></div>`;
-    toast("回填完成，已下载 .restored.docx");
-  } catch (e) { toast("失败：" + e.message); }
-};
+    toast("回填完成");
+  } catch (e) {
+    $("#r_diff").innerHTML = `<div class="blocked-note">${esc(e.message)}</div>`;
+    toast("失败：" + e.message);
+  } finally { btn.disabled = false; btn.textContent = "原格式回填"; }
+}
+$("#r_docx_run").onclick = () => runOfficeRefill(false);
 
+// --- 按任务回填：映射保存在本机，默认不需要恢复包 ---
+const TASKS = { list: [], agents: [], preferred: null };
+function taskLabel(j) {
+  let when = "";
+  try { when = j.created_at ? new Date(j.created_at * 1000).toLocaleString() : ""; } catch { when = ""; }
+  return (j.file_name || j.task_id) + (when ? " · " + when : "");
+}
+async function loadTaskOptions(preferred) {
+  if (preferred) TASKS.preferred = preferred;
+  if (typeof Option === "undefined" || !$("#r_task") || !$("#r_task").appendChild) return;  // not a real page
+  try { const { jobs } = await api("GET", "/api/v1/documents/jobs?limit=100"); TASKS.list = (jobs || []).filter((j) => j.status === "completed"); }
+  catch { TASKS.list = []; }
+  // AI tools (MCP) redact inside a session; their answers are refilled here too.
+  try { TASKS.agents = (await api("GET", "/api/v1/documents/agent-sessions?limit=20")).sessions || []; }
+  catch { TASKS.agents = []; }
+  for (const id of ["#r_task", "#an_task", "#pv_task"]) {
+    const sel = $(id); if (!sel) continue;
+    const previous = sel.value;
+    const agents = id === "#r_task" ? [] : TASKS.agents;
+    sel.innerHTML = TASKS.list.length || agents.length ? "" : '<option value="">（还没有脱敏任务，先去「文件脱敏」）</option>';
+    for (const j of TASKS.list) sel.appendChild(new Option(taskLabel(j), j.task_id));
+    if (agents.length && typeof document !== "undefined" && document.createElement) {
+      const group = document.createElement("optgroup"); group.label = "智能体会话（AI 工具通过 MCP 脱敏）";
+      for (const a of agents) group.appendChild(new Option(agentSessionLabel(a), "agent:" + a.namespace_id));
+      sel.appendChild(group);
+    }
+    const values = [...TASKS.list.map((j) => j.task_id), ...agents.map((a) => "agent:" + a.namespace_id)];
+    const has = (v) => values.includes(v);
+    sel.value = has(previous) ? previous : (has(TASKS.preferred) ? TASKS.preferred : (values[0] || ""));
+  }
+}
+function agentSessionLabel(a) {
+  let when = "";
+  try { when = a.last_ts ? new Date(a.last_ts * 1000).toLocaleString() : ""; } catch { when = ""; }
+  return "智能体会话 · " + when + " · " + (a.calls || 0) + " 次脱敏 · " + (a.placeholder_count || 0) + " 个占位符";
+}
+// Document tasks and agent sessions share the answer-refill and preview routes.
+function taskRoute(task, suffix) {
+  return task.startsWith("agent:")
+    ? "/api/v1/documents/agent-sessions/" + encodeURIComponent(task.slice(6)) + suffix
+    : "/api/v1/documents/" + encodeURIComponent(task) + suffix;
+}
+function selectedTask(id) { const sel = $(id); return sel && sel.value ? sel.value : ""; }
+if (typeof $$ === "function") $$("#tabs button").forEach((b) => b.addEventListener("click", () => { if (["refill", "answer", "preview"].includes(b.dataset.tab)) loadTaskOptions(); }));
+for (const id of ["#r_task_refresh", "#an_task_refresh"]) { const el = $(id); if (el) el.onclick = () => loadTaskOptions(); }
 const RF = { md: "", pkg: null, restored: "", base: "document" };
 $("#r_md").onchange = async () => {
   const f = $("#r_md").files[0];
@@ -1178,16 +1583,20 @@ function renderDiffLists(diff) {
   return parts.length ? `<div class="kv" style="margin-top:12px">${parts.join("")}</div>` : "";
 }
 async function doRefill(confirm) {
-  if (!RF.md) return toast("请先选择脱敏 MD 文件");
-  if (!RF.pkg) return toast("请先选择恢复包");
-  const pass = $("#r_pass").value; if (!pass) return toast("请输入恢复包口令");
-  const r = await fetch("/api/v1/documents/refill", {
+  if (!RF.md) return toast("请先选择脱敏文本文件");
+  const task = RF.pkg ? "" : selectedTask("#r_task");
+  if (!RF.pkg && !task) return toast("请选择脱敏时的任务，或改用恢复包");
+  const pass = $("#r_pass").value;
+  if (RF.pkg && !pass) return toast("请输入恢复包口令");
+  const url = RF.pkg ? "/api/v1/documents/refill" : "/api/v1/documents/" + encodeURIComponent(task) + "/refill";
+  const body = RF.pkg ? { redacted_markdown: RF.md, package: RF.pkg, passphrase: pass, confirm_edited: confirm } : { redacted_markdown: RF.md, confirm_edited: confirm };
+  const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-    body: JSON.stringify({ redacted_markdown: RF.md, package: RF.pkg, passphrase: pass, confirm_edited: confirm }),
+    body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
-  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
   if (data.status === "needs_confirmation") {
     $("#r_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 文件已被编辑（mode: ${esc(data.mode)}），请核对占位符差异：</div>` + renderDiffLists(data.diff || {});
     $("#r_confirm_row").style.display = "";
@@ -1195,8 +1604,7 @@ async function doRefill(confirm) {
   }
   if (data.status === "blocked" || !r.ok) {
     $("#r_confirm_row").style.display = "none";
-    const types = (data.error_types || []).map(esc).join("、");
-    const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+    const msg = explainError(data, r.status);
     $("#r_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>` + renderDiffLists(data.diff || {});
     return;
   }
@@ -1212,6 +1620,7 @@ $("#r_confirm_btn").onclick = () => {
   doRefill(true).catch((e) => toast("失败：" + e.message));
 };
 $("#r_dl").onclick = () => download(RF.base + ".restored.md", RF.restored, "text/markdown");
+$("#r_dl_office").onclick = () => { if (RF.office) downloadB64(RF.office.name, RF.office.b64, RF.office.mime); };
 
 // --- answer refill tab ---
 const AN = { pkg: null, restored: "" };
@@ -1232,24 +1641,25 @@ function renderAnswerSummary(s) {
 async function doAnswerRefill(confirmEmpty) {
   const text = $("#an_text").value;
   if (!text.trim()) return toast("请粘贴或导入 AI 回答");
-  if (!AN.pkg) return toast("请先选择恢复包");
-  const pass = $("#an_pass").value; if (!pass) return toast("请输入恢复包口令");
-  const r = await fetch("/api/v1/documents/refill-answer", {
+  const task = AN.pkg ? "" : selectedTask("#an_task");
+  if (!AN.pkg && !task) return toast("请选择对应的任务，或改用恢复包");
+  const pass = $("#an_pass").value;
+  if (AN.pkg && !pass) return toast("请输入恢复包口令");
+  const r = await fetch(AN.pkg ? "/api/v1/documents/refill-answer" : taskRoute(task, "/refill-answer"), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-    body: JSON.stringify({ answer_markdown: text, package: AN.pkg, passphrase: pass, confirm_empty: confirmEmpty }),
+    body: JSON.stringify(AN.pkg ? { answer_markdown: text, package: AN.pkg, passphrase: pass, confirm_empty: confirmEmpty } : { answer_markdown: text, confirm_empty: confirmEmpty }),
   });
   const data = await r.json().catch(() => ({}));
-  if (r.status === 401) throw new Error("管理 Token 无效或未设置——请在页面顶部粘贴 admin token。");
+  if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
   if (data.status === "needs_confirmation") {
-    $("#an_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 回答中未命中任何占位符——可能选错了恢复包，或 AI 确实没有引用。请确认后再继续。</div>` + renderAnswerSummary(data.summary);
+    $("#an_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 回答中没有命中任何占位符：可能选错了任务，或 AI 确实没有引用。请确认后再继续。</div>` + renderAnswerSummary(data.summary);
     $("#an_confirm_row").style.display = "";
     return;
   }
   if (data.status === "blocked" || !r.ok) {
     $("#an_confirm_row").style.display = "none";
-    const types = (data.error_types || []).map(esc).join("、");
-    const msg = types || (data.error && data.error.message) || data.detail || ("HTTP " + r.status);
+    const msg = explainError(data, r.status);
     $("#an_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>` + renderDiffLists(data.diff || {});
     return;
   }
@@ -1267,7 +1677,7 @@ $("#an_confirm_btn").onclick = () => {
 $("#an_dl").onclick = () => download("answer.restored.md", AN.restored, "text/markdown");
 
 // --- trusted preview tab ---
-const PV = { pkg: null, restored: "", lockTimer: null };
+const PV = { pkg: null, restored: "", lockTimer: null, lockEpoch: 0 };
 function highlightPH(text) {
   return esc(text).replace(/&lt;([A-Z][A-Z0-9_]*)&gt;/g,
     '<mark style="background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:0 2px">&lt;$1&gt;</mark>');
@@ -1307,12 +1717,14 @@ $("#pv_pkg").onchange = async () => {
 async function pvRefill(confirmEmpty) {
   const text = $("#pv_ans_text").value;
   if (!text.trim()) return toast("请先导入或粘贴 AI 回答");
-  if (!PV.pkg) return toast("请先选择恢复包");
-  const pass = $("#pv_pass").value; if (!pass) return toast("请输入恢复包口令");
-  const r = await fetch("/api/v1/documents/refill-answer", {
+  const task = PV.pkg ? "" : selectedTask("#pv_task");
+  if (!PV.pkg && !task) return toast("请选择对应的任务，或改用恢复包");
+  const pass = $("#pv_pass").value;
+  if (PV.pkg && !pass) return toast("请输入恢复包口令");
+  const r = await fetch(PV.pkg ? "/api/v1/documents/refill-answer" : taskRoute(task, "/refill-answer"), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-    body: JSON.stringify({ answer_markdown: text, package: PV.pkg, passphrase: pass, confirm_empty: confirmEmpty }),
+    body: JSON.stringify(PV.pkg ? { answer_markdown: text, package: PV.pkg, passphrase: pass, confirm_empty: confirmEmpty } : { answer_markdown: text, confirm_empty: confirmEmpty }),
   });
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) throw new Error("管理 Token 无效或未设置。");
@@ -1323,7 +1735,7 @@ async function pvRefill(confirmEmpty) {
   }
   if (data.status === "blocked" || !r.ok) {
     const types = (data.error_types || []).map(esc).join("、");
-    $("#pv_msg").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(types || (data.error && data.error.message) || ("HTTP " + r.status))}</div>` + renderDiffLists(data.diff || {});
+    $("#pv_msg").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(explainError(data, r.status))}</div>` + renderDiffLists(data.diff || {});
     return;
   }
   PV.restored = data.restored_markdown;
@@ -1334,6 +1746,7 @@ $("#pv_refill").onclick = () => pvRefill(false).catch((e) => toast("失败：" +
 $("#pv_ref_dl").onclick = () => download("answer.restored.md", PV.restored, "text/markdown");
 
 function lockMapping(note) {
+  PV.lockEpoch += 1;
   clearTimeout(PV.lockTimer); PV.lockTimer = null;
   $("#pv_map").innerHTML = "";
   $("#pv_lock").disabled = true;
@@ -1341,19 +1754,38 @@ function lockMapping(note) {
 }
 $("#pv_lock").onclick = () => lockMapping("已手动锁定");
 $$("#tabs button").forEach((b) => b.addEventListener("click", () => lockMapping("已随标签切换锁定")));
+function showUnlockedMapping(data) {
+  const rows = (data.entries || []).map((e) =>
+    `<tr><td><b>${esc(e.placeholder)}</b></td><td>${esc(e.label)}</td><td>${esc(e.original_value)}</td></tr>`).join("");
+  $("#pv_map").innerHTML = `<table style="margin-top:10px"><thead><tr><th>占位符</th><th>标签</th><th>原值</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("#pv_lock").disabled = false;
+  $("#pv_lock_state").textContent = "已解锁，90 秒后自动锁定";
+  clearTimeout(PV.lockTimer);
+  PV.lockTimer = setTimeout(() => lockMapping("已自动锁定"), 90000);
+}
+$("#pv_task_unlock").onclick = async () => {
+  const task = (typeof selectedTask === "function") ? selectedTask("#pv_task") : "";
+  if (!task) return toast("请先选择任务");
+  lockMapping("正在读取所选任务的原值");
+  const epoch = PV.lockEpoch;
+  $("#pv_lock").disabled = false;
+  try {
+    const data = await api("POST", taskRoute(task, "/mapping"), {});
+    if (epoch !== PV.lockEpoch || document.hidden || !$("#tab-preview").classList.contains("active")) return;
+    showUnlockedMapping(data);
+  } catch (e) { if (epoch === PV.lockEpoch) { lockMapping("读取失败"); toast("读取失败：" + e.message); } }
+};
 $("#pv_unlock").onclick = async () => {
   if (!PV.pkg) return toast("请先选择恢复包");
   const pass = $("#pv_pass").value; if (!pass) return toast("请输入恢复包口令");
+  lockMapping("正在解锁原值视图");
+  const epoch = PV.lockEpoch;
+  $("#pv_lock").disabled = false;
   try {
     const data = await api("POST", "/api/v1/documents/unlock-mapping", { package: PV.pkg, passphrase: pass });
-    const rows = (data.entries || []).map((e) =>
-      `<tr><td><b>${esc(e.placeholder)}</b></td><td>${esc(e.label)}</td><td>${esc(e.original_value)}</td></tr>`).join("");
-    $("#pv_map").innerHTML = `<table style="margin-top:10px"><thead><tr><th>占位符</th><th>标签</th><th>原值</th></tr></thead><tbody>${rows}</tbody></table>`;
-    $("#pv_lock").disabled = false;
-    $("#pv_lock_state").textContent = "已解锁，90 秒后自动锁定";
-    clearTimeout(PV.lockTimer);
-    PV.lockTimer = setTimeout(() => lockMapping("已自动锁定"), 90000);
-  } catch (e) { toast("解锁失败：" + e.message); }
+    if (epoch !== PV.lockEpoch || document.hidden || !$("#tab-preview").classList.contains("active")) return;
+    showUnlockedMapping(data);
+  } catch (e) { if (epoch === PV.lockEpoch) { lockMapping("解锁失败"); toast("解锁失败：" + e.message); } }
 };
 
 // --- records tab ---
@@ -1393,84 +1825,12 @@ async function delJob(taskId) {
 $("#rec_refresh").onclick = loadRecords;
 $$("#tabs button").forEach((b) => { if (b.dataset.tab === "records") b.addEventListener("click", loadRecords); });
 
-// --- 离线授权 ---
-function renderLicense(data) {
-  const banner = $("#licenseBanner"), badge = $("#licenseCustomer");
-  const stateLabels = { unlicensed: "未激活", valid: "有效", grace: "宽限期", expired: "已过期" };
-  if (data.customer) { badge.textContent = "授权使用：" + data.customer; badge.style.display = ""; }
-  else if (data.delivery_customer) { badge.textContent = "交付单位：" + data.delivery_customer; badge.style.display = ""; }
-  else { badge.textContent = ""; badge.style.display = "none"; }
-  if (data.enforcement !== "enabled") {
-    $("#licenseStatus").textContent = "社区源码版：无需激活；管理 Token 用于访问控制，与软件许可证无关";
-    $("#licenseKv").innerHTML = "";
-    banner.style.display = "none"; banner.textContent = "";
-    return;
-  }
-  const state = stateLabels[data.state] || data.state || "未激活";
-  $("#licenseStatus").innerHTML = `当前状态：<b>${esc(state)}</b>`;
-  $("#licenseKv").innerHTML =
-    `<span class="k">客户 <b>${esc(data.customer || "—")}</b></span>` +
-    `<span class="k">license_id <b>${esc(data.license_id || "—")}</b></span>` +
-    `<span class="k">到期时间 <b>${esc(data.expires_at || "—")}</b></span>` +
-    `<span class="k">剩余天数 <b>${esc(data.days_left == null ? "—" : data.days_left)}</b></span>` +
-    `<span class="k">宽限期 <b>${esc(data.grace_days == null ? "—" : data.grace_days)} 天</b></span>`;
-  let message = "", warn = false;
-  if (data.state === "grace") {
-    const date = data.expires_at ? String(data.expires_at).slice(0, 10) : "—";
-    message = `授权将于 ${data.days_left == null ? "—" : data.days_left} 天后到期（${date}）。宽限期 ${data.grace_days == null ? 30 : data.grace_days} 天内功能不受影响，请及时联系发行方续期。`;
-    warn = true;
-  } else if (data.state === "unlicensed") {
-    message = "未激活授权：新建脱敏/代理任务已被拦截。请在「授权」页粘贴授权码激活；已有数据的回填与导出不受影响。";
-  } else if (data.state === "expired") {
-    message = "授权已过期且宽限期已结束：新建任务已停止；已有数据的回填与导出不受影响，续期请联系发行方。";
-  }
-  if (message) {
-    banner.textContent = message;
-    banner.style.display = "block";
-    banner.style.background = warn ? "var(--warn-soft)" : "var(--danger-soft)";
-    banner.style.color = warn ? "var(--warn)" : "var(--danger)";
-    banner.style.borderColor = warn ? "#f3dcae" : "#f6c9d3";
-  } else {
-    banner.style.display = "none"; banner.textContent = "";
-  }
-}
-
-async function loadLicense() {
-  try {
-    const data = await api("GET", "/api/v1/license/status");
-    renderLicense(data);
-    return data;
-  } catch (e) {
-    $("#licenseStatus").innerHTML = '<span style="color:var(--danger)">加载失败：' + esc(e.message) + "</span>";
-    $("#licenseKv").innerHTML = "";
-    $("#licenseBanner").style.display = "none";
-    return null;
-  }
-}
-
-$("#licenseActivate").onclick = async () => {
-  const code = $("#licenseCode").value.trim();
-  if (!code) return toast("请先粘贴授权码");
-  const btn = $("#licenseActivate");
-  btn.disabled = true; btn.textContent = "激活中…";
-  $("#licenseError").textContent = "";
-  try {
-    const data = await api("POST", "/api/v1/license/activate", { code });
-    $("#licenseCode").value = "";
-    renderLicense(data);
-    toast("授权已激活");
-    await loadLicense();
-  } catch (e) {
-    $("#licenseError").textContent = e.message;
-    toast("激活失败：" + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = "激活";
-  }
-};
-
-function refreshAll() { loadSettings().then(loadAppsIntoSelectors).then(() => { if ($("#tab-onboard") && $("#tab-onboard").classList.contains("active")) wbPlan(); }).catch((e) => toast(e.message)); loadLicense(); }
+function refreshAll() { loadSettings().then(loadAppsIntoSelectors).then(() => { if ($("#tab-onboard") && $("#tab-onboard").classList.contains("active")) wbPlan(); }).catch((e) => toast(e.message)); }
 refreshTokenMeta();
-refreshAll();
+// 原生壳在页面加载后才注入 Token，并会自行调用 refreshAll()；没有 Token 时不先发一轮注定 401 的请求。
+if (getToken()) refreshAll();
+else setTimeout(() => { if (!getToken() && !window.__tuominShell) toast("请到「设置」页填写管理 Token"); }, 1500);
 </script>
+<script src="./shell-ui.js"></script>
 </body>
 </html>

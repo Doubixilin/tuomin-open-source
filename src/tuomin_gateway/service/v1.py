@@ -14,6 +14,7 @@ from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from tuomin_gateway import __version__
+from tuomin_gateway.agent_setup import AGENT_APP_ID
 from tuomin_gateway.audit import AUDIT_STREAM_NAMESPACE, build_audit_event
 from tuomin_gateway.placeholders import PLACEHOLDER_RE, reserved_placeholder_conflict
 from tuomin_gateway.namespace_vault import NamespaceMismatch, NamespaceVault
@@ -57,6 +58,7 @@ _T2_CONTRACTS = {
     "protection_receipt": "v1",
 }
 _SAFE_RECEIPT_VERSION = re.compile(r"(?:sha256:)?[a-zA-Z0-9._:-]{1,200}")
+_CLIPBOARD_PACKAGE_SOURCE = "clipboard_namespace"
 
 
 def _record_call(request: Request, *, entry: str, app_id: str, started: float, char_count: int, label_counts: dict, blocked: bool, task_id: str | None = None) -> None:
@@ -164,6 +166,9 @@ def register_v1_api(
         # abandoned session/attempt mappings do not become permanent.
         store.child("namespaces", ttl_seconds=store.ttl_seconds)
     )
+    # Shared with the workbench API, which lets the trusted UI refill an
+    # agent's answer against the agent's namespace session (agents cannot).
+    app.state.namespace_vault = namespace_vault
     inspection_vault = inspection_vault or InspectionVault(
         store.child(
             "inspections",
@@ -580,6 +585,7 @@ def register_v1_api(
                         entries, dictionary_version=dictionary_version
                     ),
                     profile,
+                    identity_mode=state.identity_contract,
                 )
                 redactor.hydrate(state.entries)
                 masked_items = [
@@ -802,6 +808,7 @@ def register_v1_api(
 
     @app.post("/api/v1/refill")
     def refill(request: Request, payload: dict = Body(default={})) -> Any:
+        started = time.monotonic()
         app_id = authorize(request, payload.get("app_id"), "trusted_refill")
         if isinstance(app_id, JSONResponse):
             return app_id
@@ -834,6 +841,20 @@ def register_v1_api(
             status=result.status,
             error_types=result.error_types,
             restored_count=restored_count,
+        )
+        label_counts: Counter[str] = Counter()
+        for entry in grant.entries:
+            occurrences = text.count(entry.placeholder)
+            if occurrences:
+                label_counts[entry.label] += occurrences
+        _record_call(
+            request,
+            entry="clipboard" if app_id == "clipboard" else "api",
+            app_id=app_id,
+            started=started,
+            char_count=len(text),
+            label_counts=dict(sorted(label_counts.items())),
+            blocked=result.status != "ok",
         )
         return {
             "version": __version__,
@@ -915,7 +936,18 @@ def register_v1_api(
         app_id = authorize_namespace(request, payload.get("app_id"))
         if isinstance(app_id, JSONResponse):
             return app_id
-        state = namespace_vault.create(app_id=app_id)
+        # "canonical" (default): aliases share one placeholder and trusted display
+        # restores the dictionary's canonical spelling. "surface": every distinct
+        # surface form gets its own placeholder, so refill restores the text the
+        # user actually wrote (clipboard / chat consumers).
+        identity_contract = payload.get("identity_contract", "canonical")
+        if identity_contract not in {"canonical", "surface"}:
+            return _error(
+                "invalid_identity_contract",
+                "identity_contract must be canonical or surface",
+                400,
+            )
+        state = namespace_vault.create(app_id=app_id, identity_contract=identity_contract)
         _audit_namespace("namespace_create", app_id, state.namespace_id)
         return {
             "status": "ok",
@@ -941,14 +973,94 @@ def register_v1_api(
             "namespace_status": state.status,
             "identity_contract": state.identity_contract,
             "placeholder_count": len(state.entries),
+            # Opaque grants remain bound to this authenticated app. Exposing
+            # their ids lets trusted clients resume without persisting them or
+            # copying mapping values out of the protected namespace store.
+            "mapping_handles": list(state.grant_handles),
             "created_at": state.created_at,
             "updated_at": state.updated_at,
+        }
+
+    @app.post("/admin/clipboard/namespaces/{namespace_id}/package")
+    def clipboard_namespace_package(
+        namespace_id: str, payload: dict = Body(default={})
+    ) -> Any:
+        """Export only ciphertext to the trusted UI, guarded by admin middleware.
+
+        The user enters the passphrase in the window. Clipboard capabilities
+        cannot call this route and no mapping values are returned to the shell.
+        Hashes bind a namespace snapshot descriptor, not an invented file.
+        """
+        from tuomin_gateway.mapproc import export_package
+
+        passphrase = payload.get("passphrase")
+        if not isinstance(passphrase, str) or not passphrase:
+            return _error("passphrase_required", "passphrase must be non-empty", 400)
+        try:
+            state = namespace_vault.load(namespace_id, app_id="clipboard")
+        except (FileNotFoundError, NamespaceMismatch, ValueError, KeyError):
+            return _error("namespace_not_found", "namespace unavailable", 404)
+        descriptor = {
+            "source_kind": _CLIPBOARD_PACKAGE_SOURCE,
+            "namespace_id": namespace_id,
+            "created_at": state.created_at,
+            "updated_at": state.updated_at,
+            "entity_count": len(state.entries),
+        }
+        source_hash = hashlib.sha256(
+            json.dumps(descriptor, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        placeholders = sorted(entry.placeholder for entry in state.entries)
+        redacted_hash = hashlib.sha256(
+            json.dumps(placeholders, separators=(",", ":")).encode()
+        ).hexdigest()
+        package = export_package(
+            state.entries,
+            passphrase=passphrase,
+            job_id=namespace_id,
+            app_id="clipboard",
+            profile="file_workbench",
+            versions={"source_kind": _CLIPBOARD_PACKAGE_SOURCE, "gateway": __version__},
+            source_sha256=source_hash,
+            redacted_sha256=redacted_hash,
+            expected_counts={placeholder: 1 for placeholder in placeholders},
+        )
+        _audit_namespace(
+            "namespace_package_export", "clipboard", namespace_id,
+            entry_count=len(state.entries),
+        )
+        return {"status": "ok", "package": package}
+
+    @app.post("/admin/clipboard/namespaces/{namespace_id}/mapping")
+    def clipboard_namespace_mapping(namespace_id: str, payload: dict = Body(default={})) -> Any:
+        """Trusted display of the clipboard session's placeholder↔value table.
+
+        Local-only admin surface for the desktop UI's auto-locking view: the
+        mapping already lives in the protected local store, so no extra
+        passphrase ritual. Audited with counts only, never values."""
+        try:
+            state = namespace_vault.load(namespace_id, app_id="clipboard")
+        except (FileNotFoundError, NamespaceMismatch, ValueError, KeyError):
+            return _error("namespace_not_found", "namespace unavailable", 404)
+        _audit_namespace(
+            "namespace_mapping_view", "clipboard", namespace_id,
+            entry_count=len(state.entries),
+        )
+        return {
+            "status": "ok",
+            "app_id": "clipboard",
+            "task_id": namespace_id,
+            "entries": [
+                {"placeholder": entry.placeholder, "label": entry.label, "original_value": entry.original_value}
+                for entry in state.entries
+            ],
         }
 
     @app.post("/api/v1/namespaces/{namespace_id}/redact")
     def namespace_redact(
         namespace_id: str, request: Request, payload: dict = Body(default={})
     ) -> Any:
+        started = time.monotonic()
         app_id = authorize_namespace(request, payload.get("app_id"))
         if isinstance(app_id, JSONResponse):
             return app_id
@@ -974,6 +1086,7 @@ def register_v1_api(
                         entries, dictionary_version=dictionary_version
                     ),
                     profile,
+                    identity_mode=state.identity_contract,
                 )
                 redactor.hydrate(state.entries)
                 masked = redactor.mask(text)
@@ -997,13 +1110,30 @@ def register_v1_api(
                 namespace_vault.save(updated)
         except (FileNotFoundError, NamespaceMismatch, ValueError, KeyError):
             return _error("namespace_not_found", "namespace unavailable", 404)
+        label_counts = dict(
+            sorted(Counter(entry.label for entry in redactor.trace_entries()).items())
+        )
+        _record_call(
+            request,
+            entry="clipboard" if app_id == "clipboard" else ("agent" if app_id == AGENT_APP_ID else "api"),
+            app_id=app_id,
+            started=started,
+            char_count=len(text),
+            label_counts=label_counts,
+            blocked=bool(redactor.blocked_labels),
+            # Agent sessions are listed from the ledger (counts only) so the
+            # trusted UI can refill an agent's answer against its namespace.
+            task_id=namespace_id if app_id == AGENT_APP_ID else None,
+        )
         return {
             "status": "ok",
             "version": __version__,
             "namespace_id": namespace_id,
             "masked_text": masked,
             "mapping_handle": handle,
-            "identity_contract": "canonical",
+            "label_counts": label_counts,
+            "entity_count": len(persisted_entries),
+            "identity_contract": state.identity_contract,
             "profile": dimensions_from_profile(profile).to_safe_dict(),
             "detectors": redactor.last_readiness.to_safe_dict()
             if redactor.last_readiness is not None

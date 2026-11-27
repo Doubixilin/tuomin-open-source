@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .pdf import PDFDependencyUnavailable, extract_pdf
+from .office_patch import extract_office_texts, probe_office
 from .vendor.doc_convert import DocConversionError, convert_doc_to_docx
 from .vendor.docx import extract_docx
 from .vendor.document_ir import DocumentBlock, source_uid as make_source_uid
@@ -18,7 +19,7 @@ from .vendor.text import extract_text
 _TEXT_EXTENSIONS = frozenset({".txt", ".md", ".csv", ".json", ".yaml", ".yml"})
 _SPREADSHEET_EXTENSIONS = frozenset({".xlsx", ".xlsm", ".xls"})
 _SUPPORTED_EXTENSIONS = tuple(
-    sorted(_TEXT_EXTENSIONS | _SPREADSHEET_EXTENSIONS | {".doc", ".docx", ".pdf"})
+    sorted(_TEXT_EXTENSIONS | _SPREADSHEET_EXTENSIONS | {".doc", ".docx", ".pdf", ".pptx"})
 )
 _HASH_CHUNK_BYTES = 1024 * 1024
 
@@ -92,6 +93,22 @@ def extract_document(path: str | Path, job_id: str) -> ExtractionResult:
                     "details": {"hidden_column_count": hidden_columns},
                 },
             ]
+    elif extension == ".pptx":
+        data = source.read_bytes()
+        warnings = probe_office(data, "pptx")
+        units = extract_office_texts(data, "pptx")
+        blocks = [
+            DocumentBlock(
+                source_id=job_id, source_uid=uid,
+                block_id=f"office-text-{index:05d}", order=index,
+                block_type="paragraph", text=unit.text,
+                extraction_method="pptx-ooxml",
+                legacy_locators=[f"{job_id}#office-text-{index:05d}"],
+                metadata={"part": unit.part, "text_index": unit.index},
+            )
+            for index, unit in enumerate(units) if unit.text.strip()
+        ]
+        stats = {"paragraph_count": len(blocks)}
     elif extension == ".pdf":
         try:
             blocks, warnings, stats = extract_pdf(source, job_id, uid)

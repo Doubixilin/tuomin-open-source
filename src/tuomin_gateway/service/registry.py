@@ -219,6 +219,7 @@ class AppRegistry:
         path = self._dict_path(app_id)
         if not path:
             raise RuntimeError("app has no dictionary file configured")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(
             json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8"
         )

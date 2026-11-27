@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuomin · Windows 使用手册</title>
+<style>
+:root{color-scheme:light;--ink:#203549;--muted:#5b6c7c;--line:#dbe3e9;--blue:#315f81}
+*{box-sizing:border-box}body{margin:0;background:#f3f6f8;color:var(--ink);font:16px/1.85 "Segoe UI","Microsoft YaHei",sans-serif}
+main{max-width:960px;margin:40px auto;padding:44px 58px;background:white;border:1px solid var(--line);border-radius:18px}
+header{border-bottom:2px solid var(--blue);padding-bottom:24px}header svg{width:64px;height:64px}h1{font-size:36px;margin:12px 0}h2{margin:38px 0 12px;font-size:23px}p{margin:10px 0}a{color:var(--blue)}nav{display:flex;gap:8px 24px;flex-wrap:wrap;padding:20px 0}nav a{text-decoration:none}
+.meta,figcaption{font-size:14px;color:var(--muted)}.note{padding:14px 18px;background:#edf4f8;border-left:3px solid var(--blue)}code{background:#eef2f5;padding:2px 6px;border-radius:4px;overflow-wrap:anywhere}li{margin:7px 0}img{width:100%;border:1px solid var(--line);border-radius:10px}figure{margin:22px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px 14px;border:1px solid var(--line);text-align:left}th{background:#edf3f7}@media(max-width:700px){main{margin:0;padding:24px;border-radius:0}h1{font-size:28px}}@media print{main{margin:0;border:0;padding:0}nav{display:none}h2{break-after:avoid}figure{break-inside:avoid}}
+</style></head><body><main>
+<header>{{logo}}<h1>Tuomin · Windows 使用手册</h1><p>本机脱敏、文件处理与 AI 工具接入</p><div class="meta">Windows x64 便携版 · 2026-10-27 · 含离线识别模型</div></header>
+<nav><a href="#install">启动与更新</a><a href="#clipboard">剪贴板</a><a href="#selection">选中文字</a><a href="#files">文件</a><a href="#dict">词典</a><a href="#agents">工具接入</a><a href="#security">数据与退出</a></nav>
+<p class="note">本手册的业务页截图沿用同版本 Mac 界面的合成演示，帮助定位功能；Windows 窗口边框、托盘、快捷键与权限以本页文字为准。检测结果需要人工核对，不承诺零遗漏。</p>
+<section id="install"><h2>1 · 启动与更新</h2><ol>
+<li>从托盘菜单退出正在运行的旧版。</li>
+<li>把 ZIP 完整解压到固定文件夹；保留 <code>_internal</code> 和所有随包文件，不能只复制 EXE。</li>
+<li>双击 <code>Tuomin.exe</code> 打开工作台。<code>Tuomin-cli.exe</code> 供 MCP、命令行与排错使用。</li>
+<li>首次向导中选择词典来源，默认「本机工作台」。按需开启登录启动，并配置快捷键。</li>
+</ol><p>桌面窗口使用系统 Microsoft Edge WebView2 Runtime。若缺少该组件，请通过微软官方安装程序补齐。此便携包未做 Authenticode 签名。</p>
+<p>后续移动安装文件夹时，在「工具接入」重新写入客户端配置。原有数据默认存放在 <code>%APPDATA%\Tuomin</code>。</p></section>
+<section id="clipboard"><h2>2 · 复制 → 脱敏 → 回填</h2><ol>
+<li>复制一段文字，按 <code>Ctrl+Alt+D</code>，或在托盘选择「脱敏剪贴板」。</li>
+<li>确认结果后粘贴到 AI 对话框。对方收到占位符，原值留在本机。</li>
+<li>复制 AI 回答，按 <code>Ctrl+Alt+R</code>，或选择「回填剪贴板」，再粘贴回文档。</li>
+</ol><p>在设置中点击快捷键输入框并按组合键即可录制，清除后不再绑定该动作。支持 Ctrl、Alt、Shift、Win，F13–F24 可单独使用。注册冲突会显示提示。</p>
+<p>同一剪贴板会话保持占位符一致；托盘可查看最近结果、查看对照表、新建或清除会话。</p></section>
+<section id="selection"><h2>3 · 选中文字与就地替换</h2><p>三项动作默认不绑定快捷键，需要在设置中自行启用：</p>
+<table><tr><th>动作</th><th>结果</th></tr><tr><td>脱敏选中文字</td><td>模拟复制所选文本，把脱敏结果放入剪贴板；原文不变。</td></tr><tr><td>选中脱敏并替换</td><td>把所选文字替换成脱敏版，再恢复之前的剪贴板文本。</td></tr><tr><td>选中回填并替换</td><td>把所选占位符回答还原后粘贴，再恢复之前的剪贴板文本。</td></tr></table>
+<p>请在支持 Ctrl+C / Ctrl+V 的应用中使用，处理完成前不要切换窗口。目标窗口或修饰键状态变化会取消替换。Windows 不需要 Mac 辅助功能授权；权限较高的目标程序可能拒绝模拟按键，此时手动复制后用普通剪贴板动作。</p>
+<p class="note">剪贴板恢复仅保留文字，不保留图片、文件列表或富文本格式；使用前请先保存需要保留的剪贴板内容。</p></section>
+<section id="files"><h2>4 · 文件脱敏、终止与回填</h2><p>打开「文件脱敏」，选择文件和词典来源，处理后保存结果。长任务可以点击「终止」；服务会协作取消处理。</p>
+<figure><img src="{{img:04-files}}" alt="文件脱敏业务页示例"><figcaption>合成示例：文件脱敏、结果与保存入口。</figcaption></figure>
+<p>Windows 托盘提供「选择文件脱敏…」，可一次选择多个文件，输出到原文件旁，重名时自动编号。完成后从托盘的结果菜单打开所在文件夹。Finder 服务和 Dock 拖放属于 Mac 入口。</p>
+<p>Word、Excel、PPT 使用原格式处理；PDF 与文本快捷处理输出 Markdown。旧版 .doc / .xls 需要本机安装 LibreOffice。加密、宏、签名或不支持的嵌入对象可能被阻断，页面会说明原因。</p>
+<p>「文件回填」可选择对应任务恢复，恢复包用于另存备份。AI 回答回填时也要选择原任务或对应智能体会话，不能混用占位符。</p></section>
+<section id="dict"><h2>5 · 维护本地词典</h2><p>在「本地词典」批量粘贴或导入 CSV / Excel，先预览识别列与重复项，再提交。可导出、复制到其他应用，或从脱敏结果中学习词条。</p>
+<figure><img src="{{img:10-dict-import}}" alt="词典导入预览示例"><figcaption>提交前核对名称、标签与重复项。</figcaption></figure>
+<p>词典用于补充本单位、项目和客户名称。切换来源后核对当前应用，避免把无关词条引入其他任务。</p></section>
+<section id="agents"><h2>6 · AI 工具接入与 WorkBuddy</h2><p>在「工具接入」选择客户端，点击「写入」可配置 MCP，并按需安装随包技能。支持 Claude Code、Codex、Cursor、Claude Desktop 和 WorkBuddy。写入保留备份，移除仅处理 Tuomin 项。</p>
+<figure><img src="{{img:09-agents}}" alt="AI 工具接入页示例"><figcaption>客户端状态、配置、自检和技能入口。</figcaption></figure>
+<p>MCP 默认指向 <code>Tuomin-cli.exe --mcp-stdio</code>。点击「自检」检查命令启动、协议、就绪状态与合成文本脱敏；真实客户端加载仍需在客户端中确认。</p>
+<p>WorkBuddy 自定义模型接入需要选择已配置上游模型的应用。生成后会备份并修正旧类型字段；「校验」检查本地格式与当前网关地址，不能代替真实模型对话验证。</p>
+<p>智能体可调用脱敏和会话接口，原值回填由本机工作台完成。测试功能使用合成文本。</p></section>
+<section id="security"><h2>7 · 数据、退出与卸载</h2><p>默认数据目录为 <code>%APPDATA%\Tuomin</code>，自定义启动可使用独立数据目录。映射采用 Windows DPAPI 加密；应用凭证、配置和词典使用受保护文件权限。复制数据到另一个 Windows 用户或另一台机器不保证能解密原映射。</p>
+<p>关窗口只隐藏到托盘；选择「退出 Tuomin」才结束服务。最近有外部工具调用时会提示确认。退出会中断仍在运行的任务，请先保存结果。</p>
+<ol><li>卸载前在「工具接入」移除客户端中的 Tuomin 配置，并关闭「登录时启动」。</li><li>从托盘退出，然后删除解压的程序文件夹。</li><li>只有确定不再需要回填时，才清除数据目录；删除映射会失去对应任务的恢复能力。</li></ol>
+<p class="meta">本包自动检查不替代真实桌面操作、第二台机器或安全软件环境的人工复测。</p></section>
+</main></body></html>

@@ -1,8 +1,17 @@
-# 脱敏网关
+# Tuomin 脱敏网关
 
-本地敏感信息检测、规则与词典脱敏、占位符映射和严格回填的开源参考实现。
+Tuomin 在本机识别敏感内容，生成带占位符的文本，并在可信环境中回填原文。仓库包含网关、macOS 和 Windows 桌面工作台、Office 文件处理、客户端接入、构建脚本及回归测试。此次发布提供源码；桌面安装包另行发布。
 
-**这是供研究与自行部署的源码版。最小示例不需要外部模型，不调用云端服务，不需要 API Key 或激活码。完整模型检测、PDF 解析、外部应用接入则需要额外准备，不能把最小示例的成功等同于完整系统已就绪。**
+## 从源码运行桌面工作台
+
+从仓库根目录创建并激活 Python 虚拟环境。桌面回归使用 Python 3.12.10，Node 测试使用 22.23.1。启动合成演示的命令如下。
+
+```bash
+python -m pip install ".[serve,shell,document]"
+python packaging/launcher.py --demo
+```
+
+演示会在临时目录创建合成词典、应用配置与 Office 文件。正常运行使用 `python packaging/launcher.py`。需要原生窗口时，macOS 使用系统 WebKit，Windows 使用 WebView2。要处理 PDF，请另行安装 `.[pdf]`；要启用中文 NER，请按[外部资源说明](docs/EXTERNAL_RESOURCES.md)准备本地权重。
 
 ## 作为本地 AI 网关使用
 
@@ -79,11 +88,11 @@ python examples/minimal_demo.py
 | 规则检测、词典匹配、重叠合并、脱敏与严格回填 | 最小示例可直接研究，无模型 |
 | 会话稳定占位符、命名空间、审计、映射保护、权限控制 | 提供实现与合成测试；部署前按场景配置 |
 | 本地 HTTP API 与 Web 控制台 | 安装 `.[serve]` 并准备应用配置 |
-| TXT / DOCX / 表格处理 | 提供实现；表格依赖 `.[document]`；旧 DOC 转换依赖 macOS 系统工具 |
+| TXT / DOCX / 表格处理 | 提供实现；表格依赖 `.[document]`；PPTX 根据受支持的文本部件处理，旧格式依平台转换条件而定 |
 | PDF 原生文字提取 | 单独安装 `.[pdf]`，先阅读 PyMuPDF 许可；不提供 OCR |
 | 本地中文 NER | 仅提供接入代码；模型权重不随仓库提供，需自行核实许可和准备 |
 | MCP、模型代理、外部应用适配 | 提供代码供研究，须自行配置服务地址、Token、上游和应用策略；最小示例不会启用 |
-| 桌面安装包、模型全集、自动部署 | 首版不提供 |
+| macOS / Windows 桌面工作台 | 含托盘或菜单栏、剪贴板、选区、热键、演示及两端构建脚本 |
 
 ## 可选：本地服务
 
@@ -117,14 +126,17 @@ macOS 服务映射默认使用钥匙串支持的加密，Windows 使用 DPAPI；
 
 公开样例不包含实际业务材料。回归测试中使用的姓名、号码和组织字符串仅用于构造检测场景，不用于联系或识别现实中的个人；不要用演示词典代替自己的受控业务词典。
 
+可运行 `python docs/competition/eval/evaluate_synthetic_contract_tuomin.py --mode rules-dictionary` 复现合成合同评测。三个场景覆盖工作范围、通知交接和现场验收；结果分别统计敏感项的移除和原有业务信息的保留。
+
 ## 测试
 
 ```bash
-python -m pip install '.[dev]'
+python -m pip install ".[dev]"
 python -m pytest -q
+npm test
 ```
 
-测试使用临时目录和合成数据，不要求下载模型。PDF 测试在未安装 PyMuPDF 时跳过；如接受其许可并需要验证 PDF，可以安装 `.[pdf]` 后重跑。平台专属测试在不适用的平台跳过。首次版本的具体验证范围见 [验证记录](docs/VALIDATION.md)。
+测试使用临时目录和合成数据，不要求下载模型。PDF 测试在未安装 PyMuPDF 时跳过；如接受其许可并需要验证 PDF，可以安装 `.[pdf]` 后重跑。平台专属测试在不适用的平台跳过。双平台验证范围见 [验证记录](docs/VALIDATION.md)。
 
 ## 许可证
 

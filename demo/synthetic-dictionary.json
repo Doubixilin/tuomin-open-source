@@ -1,0 +1,8 @@
+[
+  {"entry_id": "demo_org_1", "canonical_value": "虚构星橙工程有限公司", "aliases": [], "label": "ORG", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"},
+  {"entry_id": "demo_org_2", "canonical_value": "虚构云帆技术有限公司", "aliases": [], "label": "ORG", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"},
+  {"entry_id": "demo_person_1", "canonical_value": "许星舟", "aliases": [], "label": "PERSON", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"},
+  {"entry_id": "demo_person_2", "canonical_value": "林月禾", "aliases": [], "label": "PERSON", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"},
+  {"entry_id": "demo_contract_1", "canonical_value": "DEMO-2026-001", "aliases": [], "label": "CONTRACT_ID", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"},
+  {"entry_id": "demo_contract_2", "canonical_value": "DEMO-2026-002", "aliases": [], "label": "CONTRACT_ID", "risk_level": "high", "status": "active", "version": "synthetic-demo-v1"}
+]

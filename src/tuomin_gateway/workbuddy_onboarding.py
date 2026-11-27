@@ -20,6 +20,7 @@ import json
 import shutil
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from tuomin_gateway.gateway_discovery import (
     DEFAULT_HOST,
@@ -33,9 +34,11 @@ from tuomin_gateway.workbuddy_models import (
     PLACEHOLDER_API_KEY,
     build_entries,
     entries_for_app,
+    entry_format_errors,
     load_models,
     merge_entries,
     mode_from_url,
+    prune_app_entries,
     retarget_entries,
 )
 
@@ -61,6 +64,33 @@ class OnboardingError(Exception):
         self.code = code
         self.message = message
         self.detail = detail or {}
+
+
+def chat_ready(entry: dict | None) -> bool:
+    """True when the gateway can actually forward this app's chats upstream.
+
+    The proxy resolves the upstream from the registry entry
+    (``proxy_upstreams.openai``) or the ``TUOMIN_UPSTREAM_OPENAI`` environment;
+    without either, every WorkBuddy request is answered with
+    ``502 proxy_upstream_unavailable`` — the "connection failed" a user sees
+    after pointing WorkBuddy at the default file/clipboard workbench app."""
+    import os
+
+    if os.environ.get("TUOMIN_UPSTREAM_OPENAI"):
+        return True
+    upstreams = entry.get("proxy_upstreams") if isinstance(entry, dict) else None
+    return isinstance(upstreams, dict) and bool(upstreams.get("openai"))
+
+
+def require_chat_app(app: str, entry: dict | None) -> None:
+    if not chat_ready(entry):
+        raise OnboardingError(
+            "app_has_no_upstream",
+            f"应用 {app!r} 没有配置上游模型地址，不能接入 WorkBuddy：网关会用 502 proxy_upstream_unavailable 拒绝它的每次对话，"
+            "WorkBuddy 侧表现为「连接失败」。它是文件 / 剪贴板工作台使用的应用；请用下方「一键创建」新建一个项目应用"
+            "（填写上游地址与模型），或在「应用」页给它补上上游地址后再写入。",
+            {"app": app, "profile": (entry or {}).get("profile")},
+        )
 
 
 def default_models_path() -> Path:
@@ -164,8 +194,11 @@ def apply(
     scan_ports=None,
     allow_scan: bool = True,
     host: str = DEFAULT_HOST,
+    prune_apps=None,
 ) -> dict:
-    """Write/refresh this app's WorkBuddy entries. Never logs or returns ``api_key``."""
+    """Write/refresh this app's WorkBuddy entries. Never logs or returns ``api_key``.
+
+    ``prune_apps``: apps without an upstream whose stale entries are removed."""
     if not app or not str(app).strip():
         raise OnboardingError("app_required", "app_id 不能为空")
     if not api_key or not str(api_key).strip():
@@ -193,6 +226,7 @@ def apply(
     entries = build_entries(app, resolution.base_url, str(api_key).strip(), chosen_modes)
     retargeted = retarget_entries(existing, app, resolution.base_url)
     merged = merge_entries(existing, entries, app=app)
+    merged, pruned = prune_app_entries(merged, [a for a in (prune_apps or []) if a != app])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -204,9 +238,11 @@ def apply(
         "backup": str(backup) if backup else None,
         "written_entries": len(entries),
         "retargeted_entries": len(retargeted),
+        "pruned_entries": len(pruned),
         "models_total": len(merged),
         "model_names": [e["name"] for e in entries],
-        "hot_reload": True,
+        "workbuddy_loaded": None,
+        "note": "配置已写入；请在 WorkBuddy 的模型列表中确认，未出现时重新打开会话或重启 WorkBuddy。",
     }
 
 
@@ -238,13 +274,31 @@ def verify(
 
     by_mode: dict[str, dict] = {}
     stale: list[dict] = []
+    invalid: list[dict] = []
     for entry in app_entries:
         mode = mode_from_url(entry.get("url"), app)
+        origin = urlsplit(entry["url"])
+        gateway_origin = urlsplit(resolution.base_url or "")
+        errors = entry_format_errors(entry)
         row = {"id": entry.get("id"), "mode": mode, "url": entry.get("url"),
-               "points_at_gateway": bool(resolution.base_url and str(entry.get("url", "")).startswith(resolution.base_url))}
+               "points_at_gateway": bool(resolution.base_url and
+                   (origin.scheme, origin.netloc) == (gateway_origin.scheme, gateway_origin.netloc)),
+               "format_valid": not errors, "format_errors": errors}
         by_mode.setdefault(mode or "unknown", row)
         if not row["points_at_gateway"]:
             stale.append(row)
+        if errors:
+            invalid.append(row)
+
+    issues = []
+    if not resolution.verified:
+        issues.append("未找到挂载该应用的在线网关，请先启动网关。")
+    if not app_entries:
+        issues.append("尚未生成该应用的模型配置，请点击「生成并写入 WorkBuddy」。")
+    if invalid:
+        issues.append("模型配置格式不兼容，请使用新版重新生成并写入。")
+    if stale:
+        issues.append("存在指向旧网关的条目，请重新生成并写入以更新地址。")
 
     return {
         "app": app,
@@ -253,6 +307,9 @@ def verify(
         "models_file": str(path),
         "entries": list(by_mode.values()),
         "stale_entries": stale,
-        "ok": bool(resolution.verified and app_entries and not stale),
-        "note": "本地一致性检查；真正的端到端验证是在 WorkBuddy 里发第一条消息。",
+        "invalid_entries": invalid,
+        "issues": issues,
+        "ok": not issues,
+        "workbuddy_loaded": None,
+        "note": "仅检查本地配置格式和网关地址，尚未确认 WorkBuddy 已加载。请在 WorkBuddy 中选择模型并发送测试消息。",
     }

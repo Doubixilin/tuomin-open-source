@@ -1,0 +1,21 @@
+{
+  "name": "tuomin-gateway",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.23.1 <23"
+  },
+  "scripts": {
+    "ccr-smoke": "node scripts/ccr_daemon_smoke.cjs",
+    "ccr-e2e": "node scripts/ccr_e2e_smoke.cjs",
+    "self-check": "node scripts/ccr_self_check.cjs",
+    "test": "node --test tests/ccr/*.test.cjs",
+    "test:windows": "pwsh -NoProfile -File scripts/test_windows.ps1",
+    "doctor:windows": ".venv\\Scripts\\python.exe -X utf8 scripts/doctor_windows.py",
+    "smoke:windows": "pwsh -NoProfile -File scripts/smoke_windows.ps1",
+    "isolated-claude-gateway": "node scripts/validate_isolated_claude_gateway.cjs",
+    "doctor:macos": ".venv/bin/python scripts/doctor_macos.py",
+    "start:macos": ".venv/bin/python packaging/launcher.py",
+    "start:windows": ".venv\\Scripts\\python.exe -X utf8 packaging/launcher.py"
+  }
+}

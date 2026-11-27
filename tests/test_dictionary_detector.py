@@ -80,7 +80,8 @@ def test_dictionary_detector_ignores_empty_alias_without_hanging(tmp_path):
         cwd=Path(__file__).parents[1],
         text=True,
         capture_output=True,
-        timeout=2,
+        # Bound the empty-alias loop while allowing a cold Windows interpreter to start.
+        timeout=15 if sys.platform == "win32" else 2,
         check=True,
     )
 

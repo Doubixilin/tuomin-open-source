@@ -123,15 +123,30 @@ class AgentGateway:
 
     def __init__(
         self,
-        gateway_url: str,
+        gateway_url: str | Callable[[], str],
         redact_token: str | None,
         namespace_token: str | None,
         http_post: HttpPost = _default_http_post,
+        *,
+        session: bool = False,
     ) -> None:
-        self.gateway_url = gateway_url.rstrip("/")
+        # A callable resolves lazily on the first tool call, so the MCP
+        # handshake never waits for gateway discovery or an app launch.
+        self._gateway_url = gateway_url.rstrip("/") if isinstance(gateway_url, str) else None
+        self._resolver = None if isinstance(gateway_url, str) else gateway_url
         self.redact_token = redact_token or ""
         self.namespace_token = namespace_token or ""
         self._post = http_post
+        # Session mode: one namespace per MCP process, so repeated
+        # tuomin_redact_text calls in one conversation share placeholders.
+        self.session = session
+        self.namespace_id: str | None = None
+
+    @property
+    def gateway_url(self) -> str:
+        if self._gateway_url is None:
+            self._gateway_url = str(self._resolver()).rstrip("/")
+        return self._gateway_url
 
     def _headers(self, token: str) -> dict:
         return {"x-tuomin-capability-token": token}
@@ -161,8 +176,36 @@ class AgentGateway:
             "detectors": data.get("detectors"),
         })
 
-    def redact_text(self, app_id: str, text: str) -> dict:
+    def _ensure_namespace(self, app_id: str) -> str | None:
+        if self.namespace_id:
+            return self.namespace_id
         status, data = self._call(
+            "/api/v1/namespaces", self.namespace_token,
+            {"app_id": app_id, "identity_contract": "surface"},
+        )
+        if status == 200 and isinstance(data.get("namespace_id"), str):
+            self.namespace_id = data["namespace_id"]
+        return self.namespace_id
+
+    def _session_redact(self, app_id: str, text: str) -> tuple[int, dict] | None:
+        for _attempt in range(2):
+            namespace_id = self._ensure_namespace(app_id)
+            if not namespace_id:
+                return None  # no namespace capability: stateless fallback
+            status, data = self._call(
+                f"/api/v1/namespaces/{namespace_id}/redact", self.namespace_token,
+                {"app_id": app_id, "text": text},
+            )
+            code = (data.get("error") or {}).get("code") if isinstance(data, dict) else None
+            if code in {"namespace_not_found", "namespace_inactive"}:
+                self.namespace_id = None  # expired session: start a new one once
+                continue
+            return status, data
+        return None
+
+    def redact_text(self, app_id: str, text: str) -> dict:
+        outcome = self._session_redact(app_id, text) if self.session and self.namespace_token else None
+        status, data = outcome if outcome is not None else self._call(
             "/api/v1/redact", self.redact_token, {"app_id": app_id, "text": text}
         )
         if status != 200:
@@ -180,6 +223,9 @@ class AgentGateway:
             "blocked_labels": data.get("blocked_labels"),
             "label_counts": data.get("label_counts"),
             "job_id": data.get("mapping_handle"),
+            # Opaque session id: lets the user pick this conversation in the
+            # local UI's answer refill. It grants nothing to the agent.
+            "session_id": data.get("namespace_id"),
             "detectors": {
                 "degraded": detectors.get("degraded"),
                 "missing_required": missing,
@@ -291,11 +337,18 @@ def resolve_gateway_from_env(env: dict | None = None, *, resolver=None) -> str:
     return resolution.base_url or DEFAULT_GATEWAY_URL
 
 
-def main() -> int:
+def main(gateway_resolver: Callable[[], str] | None = None) -> int:
+    # Frozen Windows console launchers may ignore Python's encoding env vars.
+    # MCP is UTF-8 on both pipes, regardless of the host console code page.
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, 'reconfigure', None)
+        if callable(reconfigure):
+            reconfigure(encoding='utf-8')
     gateway = AgentGateway(
-        gateway_url=resolve_gateway_from_env(),
+        gateway_url=gateway_resolver or (lambda: resolve_gateway_from_env()),
         redact_token=os.environ.get("TUOMIN_AGENT_REDACT_TOKEN"),
         namespace_token=os.environ.get("TUOMIN_AGENT_NAMESPACE_TOKEN"),
+        session=os.environ.get("TUOMIN_AGENT_SESSION", "0") == "1",
     )
     print("tuomin-mcp: stdio server ready", file=sys.stderr)
     for line in sys.stdin:

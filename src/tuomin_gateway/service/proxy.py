@@ -76,6 +76,9 @@ from tuomin_gateway.session import (
 )
 from tuomin_gateway.store import MappingStore
 from tuomin_gateway.vault import MappingVault
+from tuomin_gateway import cancellation
+from tuomin_gateway.ner_cache import NerCache, prepare as prepare_ner
+from tuomin_gateway.service.proxy_work import ProxyBusy, ProxyWorkQueue, connected, forward_connected
 
 # A forwarder sends the (already masked) request upstream and returns the raw
 # response. Injected so tests can supply a fake upstream with no network.
@@ -224,6 +227,13 @@ def mask_request(payload: dict, redactor: SessionRedactor, *, include_system: bo
                 elif isinstance(arguments, (dict, list)):
                     fn["arguments"] = _mask_string_leaves(redactor, arguments)
     return payload
+
+
+def optimized_mask_request(payload, redactor, *, cache, scope, metrics, include_system=False):
+    """Reuse only NER spans; execute the original masking traversal in order."""
+    texts = _masked_text_parts(payload, include_system=include_system)
+    with prepare_ner(texts, enabled=redactor.profile.use_ner, cache=cache, scope=scope, metrics=metrics):
+        return mask_request(payload, redactor, include_system=include_system)
 
 
 # --------------------------------------------------------------------------
@@ -672,32 +682,30 @@ async def _refill_event_stream(
     ``include_reasoning=False`` (demo mode) passes chain-of-thought fields
     through still masked, as visible redaction evidence."""
     event_buffer = ""
-    text_buffer = ""
-    last_chunk: dict | None = None
-    last_path: list | None = None
-    last_prefix: list[str] | None = None
+    text_buffers: dict[tuple, str] = {}
+    last_frames: dict[tuple, tuple] = {}
     blocked = False
     decoder = codecs.getincrementaldecoder("utf-8")()
     rolling = _StreamOutputGuard(profile) if profile is not None else None
 
-    def flush_pending() -> bytes | None:
-        nonlocal text_buffer
-        if not text_buffer:
-            return None
-        chunk = json.loads(json.dumps(last_chunk)) if last_chunk else {"choices": [{"delta": {"content": ""}}]}
-        path = last_path or ["choices", 0, "delta", "content"]
-        _set_at(
-            chunk,
-            path,
-            _refill_string(
-                redactor, text_buffer, stats, allow_missing=document_validated
-            ),
-        )
-        text_buffer = ""
-        return _emit_sse(last_prefix or [], json.dumps(chunk, ensure_ascii=False))
+    def flush_pending() -> list[bytes]:
+        pending = []
+        for key, text in list(text_buffers.items()):
+            if not text:
+                continue
+            original, prefix = last_frames[key]
+            chunk = json.loads(json.dumps(original))
+            # Other text in the saved frame was already emitted. Never replay
+            # reasoning/content/tool args when flushing another field's tail.
+            for path in _stream_text_paths(chunk, include_reasoning=True):
+                _set_at(chunk, path, "")
+            _set_at(chunk, list(key), _refill_string(redactor, text, stats, allow_missing=document_validated))
+            text_buffers[key] = ""
+            pending.append(_emit_sse(prefix, json.dumps(chunk, ensure_ascii=False)))
+        return pending
 
     async def process_event(block: str) -> AsyncIterator[bytes]:
-        nonlocal text_buffer, last_chunk, last_path, last_prefix, blocked
+        nonlocal blocked
         if not block.strip():
             return
         prefix, data = _parse_sse_block(block)
@@ -705,8 +713,7 @@ async def _refill_event_stream(
             yield _emit_sse(prefix, None)
             return
         if data.strip() == "[DONE]":
-            pending = flush_pending()
-            if pending:
+            for pending in flush_pending():
                 yield pending
             yield _emit_sse(prefix, "[DONE]")
             return
@@ -715,36 +722,24 @@ async def _refill_event_stream(
         except json.JSONDecodeError:
             yield _emit_sse(prefix, data)
             return
-        path = _first_stream_text(chunk, include_reasoning=include_reasoning)
-        if path is None:
-            yield _emit_sse(prefix, json.dumps(chunk, ensure_ascii=False))
-            return
-        text_buffer += _get_at(chunk, path)
-        last_chunk, last_path, last_prefix = chunk, path, prefix
-        safe, rest = split_safe_text(text_buffer)
-        text_buffer = rest
-        if not safe:
-            # Preserve non-text stream metadata (notably tool-call id/name)
-            # while holding back a partial placeholder or empty argument
-            # fragment.  An empty text delta is protocol-safe.
-            _set_at(chunk, path, "")
-            yield _emit_sse(prefix, json.dumps(chunk, ensure_ascii=False))
-            return
-        # Output guard on the masked-space segment (model-emitted secrets are in
-        # clear here; placeholders are refilled below). Blocking ends the stream.
-        if rolling is not None:
-            seg_guard = rolling.scan(safe)
-            if seg_guard.events and on_guard_events is not None:
-                on_guard_events(seg_guard.events)
-            if seg_guard.blocking:
-                blocked = True
-                yield _guard_stream_block_event(seg_guard.blocking)
-                return
-        _set_at(
-            chunk,
-            path,
-            _refill_string(redactor, safe, stats, allow_missing=document_validated),
-        )
+        original = json.loads(json.dumps(chunk))
+        for path in _stream_text_paths(chunk, include_reasoning=include_reasoning):
+            key = tuple(path)
+            text = text_buffers.get(key, "") + _get_at(chunk, path)
+            last_frames[key] = (original, prefix)
+            safe, text_buffers[key] = split_safe_text(text)
+            if not safe:
+                _set_at(chunk, path, "")
+                continue
+            if rolling is not None:
+                seg_guard = rolling.scan(safe)
+                if seg_guard.events and on_guard_events is not None:
+                    on_guard_events(seg_guard.events)
+                if seg_guard.blocking:
+                    blocked = True
+                    yield _guard_stream_block_event(seg_guard.blocking)
+                    return
+            _set_at(chunk, path, _refill_string(redactor, safe, stats, allow_missing=document_validated))
         yield _emit_sse(prefix, json.dumps(chunk, ensure_ascii=False))
 
     async for raw in aiter:
@@ -763,8 +758,7 @@ async def _refill_event_stream(
             yield out
         if blocked:
             return
-    pending = flush_pending()
-    if pending:
+    for pending in flush_pending():
         yield pending
 
 
@@ -828,7 +822,7 @@ def collect_text(payload: dict) -> str:
     return "\n".join(parts)
 
 
-def collect_masked_text(payload: dict, *, include_system: bool = False) -> str:
+def _masked_text_parts(payload: dict, *, include_system: bool = False) -> list[str]:
     """Concatenate exactly the text ``mask_request`` would transform, on the
     ORIGINAL payload — used for the reserved-placeholder forgery check. System
     content is excluded by default (it is not masked, so a literal placeholder
@@ -888,7 +882,11 @@ def collect_masked_text(payload: dict, *, include_system: bool = False) -> str:
             fn = call.get("function") if isinstance(call, dict) else None
             if isinstance(fn, dict):
                 walk_string_leaves(fn.get("arguments"))
-    return "\n".join(parts)
+    return parts
+
+
+def collect_masked_text(payload: dict, *, include_system: bool = False) -> str:
+    return "\n".join(_masked_text_parts(payload, include_system=include_system))
 
 
 def _upstream_headers(request: Request) -> dict[str, str]:
@@ -994,6 +992,8 @@ def register_proxy(
 ) -> None:
     """Mount /v1/messages (Anthropic) and /v1/chat/completions (OpenAI)."""
     forward = forwarder or _httpx_forward
+    ner_cache = NerCache()
+    cpu_queue = ProxyWorkQueue()
     if legacy_auto_refill is None:
         legacy_auto_refill = os.environ.get(
             "TUOMIN_PROXY_LEGACY_AUTO_REFILL", ""
@@ -1095,16 +1095,60 @@ def register_proxy(
             "coverage_finding_count": 0,
         }
 
-    async def handle(
+    async def handle(request, env_key, **kwargs):
+        metrics = {}
+        started = time.perf_counter()
+
+        def record(status, stage):
+            if audit_log is not None:
+                try:
+                    audit_log.write("proxy-performance", {
+                        "event": "proxy_performance", "stage": stage, "status": status,
+                        "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                        **metrics,
+                    })
+                except Exception:
+                    pass
+        try:
+            response = await _handle(request, env_key, metrics=metrics, **kwargs)
+        except cancellation.Cancelled:
+            record(499, "cancelled")
+            return JSONResponse({"error": {"code": "cancelled", "message": "request cancelled"}}, status_code=499)
+        except BaseException:
+            record(500, "aborted")
+            raise
+        response.headers["server-timing"] = ", ".join(
+            f"{name[:-3]};dur={value}" for name, value in metrics.items() if name.endswith("_ms")
+        )
+        record(response.status_code, "response_headers")
+        if isinstance(response, StreamingResponse):
+            iterator = response.body_iterator
+
+            async def measured_stream():
+                finished = False
+                try:
+                    async for chunk in iterator:
+                        metrics.setdefault("first_response_chunk_ms", round((time.perf_counter() - started) * 1000, 3))
+                        yield chunk
+                    finished = True
+                finally:
+                    await iterator.aclose()
+                    record(response.status_code, "stream_finished" if finished else "stream_aborted")
+            response.body_iterator = measured_stream()
+        return response
+
+    async def _handle(
         request: Request,
         env_key: str,
         *,
+        metrics: dict,
         proxy_session: dict[str, Any] | None = None,
         path_app_id: str | None = None,
         path_auto_refill: bool = False,
         path_reasoning_masked: bool = False,
     ) -> Any:
         started = time.monotonic()
+        cancel_event = cancellation.current_event() or threading.Event()
         raw_body = await request.body()
         if len(raw_body) > max_request_bytes():
             return JSONResponse(
@@ -1265,7 +1309,9 @@ def register_proxy(
         )
 
         # --- input guard (pillars 5 & 6): scan ORIGINAL text before masking ---
+        guard_start = time.perf_counter()
         guard_in = guard.scan_input(collect_text(payload), profile)
+        metrics["guard_ms"] = round((time.perf_counter() - guard_start) * 1000, 3)
         _audit_guard_events(audit_log, guard_in.events, channel="proxy_input", app_id=app_id)
         if guard_in.blocking:
             return JSONResponse(
@@ -1290,11 +1336,21 @@ def register_proxy(
 
         # --- mask outbound (fail-closed) ---
         try:
-            masked = mask_request(
-                payload,
-                redactor,
-                include_system=proxy_session is not None,
-            )
+            def mask_work():
+                mask_start = time.perf_counter()
+                try:
+                    return optimized_mask_request(
+                        payload, redactor, cache=ner_cache, scope=app_id or "legacy",
+                        metrics=metrics, include_system=proxy_session is not None,
+                    )
+                finally:
+                    metrics["mask_ms"] = round((time.perf_counter() - mask_start) * 1000, 3)
+            masked = await cpu_queue.run(request, cancel_event, mask_work, metrics)
+        except cancellation.Cancelled:
+            raise
+        except ProxyBusy:
+            return JSONResponse({"error": {"code": "proxy_busy", "message": "local redaction queue is full"}},
+                                status_code=503, headers={"retry-after": "2"})
         except RequiredDetectorUnavailable as exc:
             return JSONResponse(
                 {
@@ -1309,6 +1365,7 @@ def register_proxy(
         except Exception:  # pragma: no cover - defensive
             return JSONResponse({"error": {"message": "tuomin mask failed"}}, status_code=502)
 
+        await connected(request, cancel_event)
         detector_headers = {
             "x-tuomin-detectors-degraded": str(
                 bool(redactor.last_readiness and redactor.last_readiness.to_safe_dict()["degraded"])
@@ -1396,9 +1453,15 @@ def register_proxy(
         headers = _upstream_headers(request)
 
         try:
-            result = await forward(upstream, headers, body, stream=stream)
+            upstream_start = time.perf_counter()
+            result = await forward_connected(request, cancel_event, forward(upstream, headers, body, stream=stream))
+            metrics["upstream_headers_ms"] = round((time.perf_counter() - upstream_start) * 1000, 3)
+        except cancellation.Cancelled:
+            raise
         except Exception as exc:
             return JSONResponse({"error": {"message": f"tuomin upstream forward failed: {exc}"}}, status_code=502)
+        finally:
+            metrics["upstream_headers_ms"] = round((time.perf_counter() - upstream_start) * 1000, 3)
 
         _record_proxy_call(app_id, started, char_count=len(body), redactor=redactor)
 
@@ -1873,7 +1936,11 @@ async def _httpx_forward(url: str, headers: dict[str, str], body: bytes, *, stre
     # 401/429/500 is surfaced to the client as itself, not a fake 200.
     client = httpx.AsyncClient(timeout=timeout, trust_env=False)
     stream_cm = client.stream("POST", url, headers=headers, content=body)
-    resp = await stream_cm.__aenter__()
+    try:
+        resp = await stream_cm.__aenter__()
+    except BaseException:
+        await client.aclose()
+        raise
 
     async def _aiter() -> AsyncIterator[bytes]:
         try:

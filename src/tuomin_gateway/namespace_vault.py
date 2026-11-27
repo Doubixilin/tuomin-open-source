@@ -85,10 +85,14 @@ class NamespaceVault:
                     else:
                         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def create(self, *, app_id: str) -> NamespaceState:
+    def create(self, *, app_id: str, identity_contract: str = "canonical") -> NamespaceState:
+        if identity_contract not in {"canonical", "surface"}:
+            raise ValueError("identity_contract must be canonical or surface")
         namespace_id = f"ns_{secrets.token_urlsafe(24)}"
         now = int(time.time())
-        state = NamespaceState(namespace_id, app_id, "active", [], now, now)
+        state = NamespaceState(
+            namespace_id, app_id, "active", [], now, now, identity_contract=identity_contract
+        )
         self.save(state)
         return state
 

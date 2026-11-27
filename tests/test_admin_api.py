@@ -139,3 +139,42 @@ def test_admin_rejects_foreign_host(tmp_path):
     # DNS-rebinding style request with an attacker Host is refused even with token.
     r = client.get("/admin/apps", headers={"host": "evil.example.com"})
     assert r.status_code == 403
+
+
+def test_app_upsert_accepts_dictionary_already_registered_for_another_app(tmp_path, monkeypatch):
+    client, dict_path, _ = _setup(tmp_path)
+    # Confinement root that does NOT contain the demo app's dictionary.
+    monkeypatch.setenv("TUOMIN_DATA_DIR", str(tmp_path / "data-root"))
+
+    mirrored = client.put("/admin/apps/mirror", json={"profile": "strict", "dictionary": str(dict_path)})
+    assert mirrored.status_code == 200
+    assert mirrored.json()["entry"]["dictionary"] == str(dict_path)
+
+    outside = client.put("/admin/apps/other", json={"profile": "strict", "dictionary": str(tmp_path / "never-registered.json")})
+    assert outside.status_code == 400
+    assert outside.json()["detail"] == "dictionary 路径必须在 TUOMIN_DATA_DIR 内"
+
+    # An app may not launder its own current path: only other apps' dictionaries are trusted.
+    client.delete("/admin/apps/mirror")
+    self_only = client.put("/admin/apps/demo", json={"profile": "strict", "dictionary": str(dict_path)})
+    assert self_only.status_code == 400
+
+
+def test_app_upsert_creates_a_missing_dictionary_inside_the_data_dir(tmp_path, monkeypatch):
+    client, _, _ = _setup(tmp_path)
+    monkeypatch.setenv("TUOMIN_DATA_DIR", str(tmp_path))
+
+    saved = client.put("/admin/apps/fresh", json={"sensitivity": "strict", "name": "新应用", "dictionary": "dictionaries/fresh.json"})
+    assert saved.status_code == 200
+    created = tmp_path / "dictionaries" / "fresh.json"
+    assert created.read_text(encoding="utf-8").strip() == "[]"
+    from tests.permission_assertions import assert_owner_private
+    assert_owner_private(created, is_dir=False)
+    assert saved.json()["entry"]["dictionary"] == str(created)
+    listed = client.get("/admin/apps").json()["apps"]
+    assert any(a["app_id"] == "fresh" and a["name"] == "新应用" and a["has_dictionary"] for a in listed)
+
+    # The new dictionary is immediately editable.
+    added = client.post("/admin/apps/fresh/dictionary", json={"canonical_value": "示例新单位", "label": "ORG", "aliases": ["新单位"]})
+    assert added.status_code == 200
+    assert len(client.get("/admin/apps/fresh/dictionary").json()["entries"]) == 1

@@ -7,7 +7,8 @@ model so CJK entity boundaries are correct (GLiNER multilingual fails at this).
 Heavy + optional: the model (~400MB) is loaded lazily and cached per process,
 only when a profile requests NER. Source label is "model" so fusion gives it
 the lowest priority — the exact dictionary and rules override it on overlap.
-Requires the optional ``[ner]`` extra (transformers + torch).
+Requires the optional ``[ner]`` extra (transformers + torch). Runs on CPU by
+default; ``TUOMIN_NER_DEVICE`` opts into CUDA or Apple MPS (see ``_resolve_device``).
 
 Long documents are chunked into overlapping windows before inference (the
 RoBERTa base caps at 512 positions; feeding more is undefined — a crash or a
@@ -43,6 +44,41 @@ def _model_source(model_name: str, model_revision: str | None) -> tuple[str, dic
         return model_dir, {}
     return model_name, ({"revision": model_revision} if model_revision else {})
 
+
+def _resolve_device() -> int | str:
+    """Resolve the inference device for the NER pipeline.
+
+    CPU by default: the device can shift tokenizer padding and aggregation
+    numerics, so the recorded benchmark numbers stay reproducible unless an
+    operator asks otherwise. ``TUOMIN_NER_DEVICE`` opts in — ``cpu`` / ``-1``
+    (default), ``cuda`` / ``gpu`` (first visible CUDA device), a non-negative
+    CUDA index, ``mps`` (Apple Silicon GPU), or ``auto`` (CUDA, then MPS). A
+    request torch cannot serve (no CUDA/MPS build, no visible device, index out
+    of range) falls back to CPU rather than failing the detector.
+    """
+    import os
+
+    raw = (os.environ.get("TUOMIN_NER_DEVICE") or "").strip().lower()
+    if raw in ("", "cpu", "-1"):
+        return -1
+    if raw.isdigit():
+        index = int(raw)
+    elif raw in ("cuda", "gpu", "auto", "mps"):
+        index = 0
+    else:
+        return -1
+    try:
+        import torch
+    except Exception:  # pragma: no cover - optional dependency
+        return -1
+    if raw != "mps" and torch.cuda.is_available() and index < torch.cuda.device_count():
+        return index
+    if raw in ("mps", "auto"):
+        mps = getattr(getattr(torch, "backends", None), "mps", None)
+        if mps is not None and mps.is_available():
+            return "mps"
+    return -1
+
 # Inference window in CHARACTERS. The char-level Chinese model uses ~1 token
 # per char; 384 leaves ample headroom under the 512 position cap even with
 # [CLS]/[SEP] and ASCII subword expansion.
@@ -54,10 +90,11 @@ OVERLAP_CHARS = 64
 # Sentence-ish boundaries preferred when cutting a window (newline handled
 # separately and preferred over these).
 _CHUNK_BREAK_CHARS = "。；;！!？?"
-# Windows per batched pipeline call. Batching does not change total compute
-# (same windows, same tokens) — it only cuts per-call Python/scheduling
-# overhead; the cap bounds peak activation memory to a small constant on CPU.
-INFER_BATCH_SIZE = 8
+# Windows per batched pipeline call. A batch is padded to its longest window,
+# so ``_infer`` groups windows of similar length: total compute stays that of
+# the real tokens, while per-call Python/scheduling overhead drops. The cap
+# bounds peak activation memory to a small constant on CPU.
+INFER_BATCH_SIZE = 16
 
 # CLUENER type -> our redaction label. Types not listed (book/game/movie/scene/
 # position) are dropped as noise / non-identity.
@@ -383,6 +420,7 @@ class CluenerNerDetector(BaseDetector):
                     model=model,
                     tokenizer=tokenizer,
                     aggregation_strategy="simple",
+                    device=_resolve_device(),
                 )
             except Exception as exc:
                 raise NerUnavailable(f"NER 模型未在本地可用或加载失败：{exc}") from exc
@@ -396,22 +434,85 @@ class CluenerNerDetector(BaseDetector):
         sequential calls, but far less per-call overhead — and the lock is
         held for one short stretch instead of many, so concurrent requests
         wait less. Always passes a list so the return shape is uniform.
+
+        Windows are batched shortest-first and returned in the caller's order:
+        mixing a 30-char tool description with a 380-char window pads the short
+        one to full length, which was about half the compute for tool lists.
         """
         with self._lock:
             pipe = self._pipeline()
-            results: list = []
-            for i in range(0, len(texts), INFER_BATCH_SIZE):
-                results.extend(pipe(texts[i : i + INFER_BATCH_SIZE], batch_size=INFER_BATCH_SIZE))
+            results: list = [None] * len(texts)
+            from tuomin_gateway.cancellation import check as _check_cancelled
+
+            order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
+            for i in range(0, len(order), INFER_BATCH_SIZE):
+                _check_cancelled()  # long documents: let a user-requested cancel stop the next batch
+                batch = order[i : i + INFER_BATCH_SIZE]
+                outputs = pipe([texts[j] for j in batch], batch_size=INFER_BATCH_SIZE)
+                if len(outputs) != len(batch):
+                    raise NerUnavailable("incomplete NER batch")
+                for j, entities in zip(batch, outputs):
+                    results[j] = entities
             return results
 
     def detect(self, text: str):
         if not text or not text.strip():
             return []
-        spans = []
-        seen: set[tuple[int, int, str]] = set()
         bounds = _chunk_bounds(text)
         windows = [text[start:end] for start, end in bounds]
-        for (chunk_start, chunk_end), entities in zip(bounds, self._infer(windows)):
+        return self._decode(text, bounds, self._infer(windows))
+
+    def cache_identity(self) -> tuple:
+        """Identify the loaded weights and every inference/postprocessing setting."""
+        with self._lock:
+            pipe = self._pipeline()  # readiness must be checked even on cache hits
+        return (self.version, self.model_name, self.model_revision, self.threshold,
+                id(pipe), str(getattr(pipe, "device", "")), MAX_WINDOW_CHARS, OVERLAP_CHARS,
+                INFER_BATCH_SIZE, "cluener-postprocess-v1")
+
+    def detect_many(self, texts: list[str], window_cache=None) -> list[list]:
+        """Batch independent windows without joining text or changing offsets.
+
+        A window's prediction depends only on its own text, so identical
+        windows are inferred once. ``window_cache`` (``get(window)`` /
+        ``put(window, predictions)``) reuses raw predictions for windows of
+        multi-window texts: when a long field grows, only its tail windows are
+        new. Single-window texts are left to the caller's whole-text cache.
+        """
+        bounds = [_chunk_bounds(text) if text and text.strip() else [] for text in texts]
+        windows = [text[start:end] for text, spans in zip(texts, bounds) for start, end in spans]
+        cacheable: dict[str, None] = {}
+        if window_cache is not None:
+            cacheable = dict.fromkeys(text[start:end] for text, spans in zip(texts, bounds)
+                                      if len(spans) > 1 for start, end in spans)
+        known: dict[str, list] = {}
+        for window in cacheable:
+            hit = window_cache.get(window)
+            if hit is not None:
+                known[window] = hit
+        missing = list(dict.fromkeys(w for w in windows if w not in known))
+        inferred = self._infer(missing) if missing else []
+        if len(inferred) != len(missing):
+            raise NerUnavailable("incomplete NER batch")
+        for window, entities in zip(missing, inferred):
+            known[window] = entities
+            if window in cacheable:
+                window_cache.put(window, entities)
+        predictions = [known[w] for w in windows]
+        result, offset = [], 0
+        from tuomin_gateway.cancellation import check
+        for text, spans in zip(texts, bounds):
+            check()
+            result.append(self._decode(text, spans, predictions[offset:offset + len(spans)]))
+            offset += len(spans)
+        return result
+
+    def _decode(self, text, bounds, predictions):
+        if len(bounds) != len(predictions):
+            raise NerUnavailable("incomplete NER result")
+        spans = []
+        seen: set[tuple[int, int, str]] = set()
+        for (chunk_start, chunk_end), entities in zip(bounds, predictions):
             chunk = text[chunk_start:chunk_end]
             for e in entities:
                 label = LABEL_MAP.get(e.get("entity_group"))

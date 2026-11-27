@@ -34,6 +34,7 @@ from tuomin_gateway.roles import assign_roles
 from tuomin_gateway.schemas import DetectionSpan
 from tuomin_gateway.schemas import MappingEntry
 from tuomin_gateway.schemas import RedactionTraceEntry
+from tuomin_gateway.cancellation import Cancelled
 
 
 _PLACEHOLDER_PARTS_RE = re.compile(r"^<([A-Z][A-Z0-9_]*?)_(\d+)>$")
@@ -228,7 +229,10 @@ def run_detection(
     private_key_ranges(text)  # framing failures are input errors, not detector failures
     spans: list[DetectionSpan] = []
     states: list[DetectorState] = []
+    from tuomin_gateway.cancellation import check as _check_cancelled
+
     for detector in detectors:
+        _check_cancelled()
         try:
             spans.extend(detector.detect(text))
             states.append(
@@ -239,6 +243,8 @@ def run_detection(
                     version=getattr(detector, "version", None),
                 )
             )
+        except Cancelled:
+            raise
         except Exception as exc:
             states.append(
                 DetectorState(
@@ -271,7 +277,8 @@ def run_detection(
             from tuomin_gateway.detectors.ner import get_ner_detector
 
             ner = get_ner_detector()
-            spans.extend(ner.detect(text))
+            from tuomin_gateway.ner_cache import detect as detect_ner
+            spans.extend(detect_ner(text, ner))
             states.append(
                 DetectorState(
                     name="ner",
@@ -280,6 +287,8 @@ def run_detection(
                     version=getattr(ner, "version", None),
                 )
             )
+        except Cancelled:
+            raise
         except Exception as exc:
             states.append(
                 DetectorState(

@@ -22,7 +22,7 @@ import re
 import uuid
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Request, Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from tuomin_gateway import __version__
@@ -66,6 +66,7 @@ _AUDIT_STREAMS = {
     AUDIT_STREAM_ADMIN,
     # Workbench package-export events (v1_documents.py writes this stream).
     "workbench",
+    "proxy-performance",
 }
 _AUDIT_TAIL_MAX = 200
 
@@ -98,7 +99,30 @@ def _safe_data_path(raw: object) -> str:
     return raw
 
 
-def _validate_app_entry(entry: object) -> dict:
+def _ensure_dictionary_file(path_value: object) -> None:
+    """Create an empty dictionary for a newly declared path inside TUOMIN_DATA_DIR.
+
+    Declaring a dictionary that does not exist would otherwise fail closed on the
+    first redaction ("declared dictionary unavailable"). Only paths confined to
+    the data directory are created; trusted external paths are left untouched."""
+    root = os.environ.get("TUOMIN_DATA_DIR")
+    if not root or not isinstance(path_value, str) or not path_value:
+        return
+    path = Path(path_value)
+    try:
+        path.resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return
+    if path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    from tuomin_gateway.platform_security import restrict_permissions
+    restrict_permissions(path.parent, is_dir=True)
+    path.write_text("[]\n", encoding="utf-8")
+    restrict_permissions(path, is_dir=False)
+
+
+def _validate_app_entry(entry: object, *, trusted_dictionaries: frozenset[str] = frozenset()) -> dict:
     if not isinstance(entry, dict):
         raise HTTPException(status_code=400, detail="entry 必须是对象")
     unknown = set(entry) - _ALLOWED_APP_KEYS
@@ -137,7 +161,12 @@ def _validate_app_entry(entry: object) -> dict:
         raise HTTPException(status_code=400, detail="structured_value_labels 配置无效")
     out = dict(entry)
     if "dictionary" in out:
-        out["dictionary"] = _safe_data_path(out["dictionary"])
+        raw = out["dictionary"]
+        # A path the registry already loads for another app is not a new file
+        # access: mirroring it (e.g. the clipboard app following a source app)
+        # may bypass the data-dir confinement meant for arbitrary admin input.
+        if not (isinstance(raw, str) and raw in trusted_dictionaries):
+            out["dictionary"] = _safe_data_path(raw)
     return out
 
 
@@ -190,6 +219,10 @@ def register_admin(
         except OSError:
             pass
 
+    from tuomin_gateway.service.admin_agents import register_agent_admin
+
+    register_agent_admin(app, registry, _audit)
+
     def _require_app(app_id: str) -> dict:
         entry = registry.get_app(app_id)
         if entry is None:
@@ -203,6 +236,7 @@ def register_admin(
             entry = registry.get_app(app_id) or {}
             apps.append({
                 "app_id": app_id,
+                "name": entry.get("name"),
                 "profile": entry.get("profile"),
                 "sensitivity": entry.get("sensitivity"),
                 "scenario": entry.get("scenario"),
@@ -216,7 +250,15 @@ def register_admin(
 
     @app.put("/admin/apps/{app_id}")
     def put_app(app_id: str, entry: dict = Body(default={})) -> dict:
-        validated = _validate_app_entry(entry)
+        trusted = frozenset(
+            path
+            for known in registry.known_apps()
+            if known != app_id
+            and isinstance(path := (registry.get_app(known) or {}).get("dictionary"), str)
+            and path
+        )
+        validated = _validate_app_entry(entry, trusted_dictionaries=trusted)
+        _ensure_dictionary_file(validated.get("dictionary"))
         registry.upsert_app(app_id, validated)
         _audit("admin_app_upsert", app_id=app_id)
         return {"app_id": app_id, "entry": _public_app_entry(registry.get_app(app_id) or {})}
@@ -231,6 +273,61 @@ def register_admin(
     def list_entries(app_id: str) -> dict:
         _require_app(app_id)
         return {"app_id": app_id, "entries": registry.load_entries(app_id)}
+
+    @app.post("/admin/apps/{app_id}/dictionary/import")
+    def import_entries(app_id: str, payload: dict = Body(default={})) -> dict:
+        """Bulk import with preview. ``dry_run`` (default true) writes nothing."""
+        import base64
+
+        from tuomin_gateway import dictionary_import as di
+
+        _require_app(app_id)
+        dry_run = payload.get("dry_run", True) is not False
+        if not dry_run and getattr(app.state, "demo", False):
+            raise HTTPException(status_code=403, detail="演示模式下词典只读")
+        if not registry.get_app(app_id).get("dictionary"):
+            raise HTTPException(status_code=400, detail="该应用没有词典文件，请先在「应用与档位」里为它配置词典")
+        fmt = payload.get("format", "text")
+        try:
+            if fmt == "app":
+                source = payload.get("source_app")
+                if not isinstance(source, str) or registry.get_app(source) is None or source == app_id:
+                    raise HTTPException(status_code=400, detail="来源应用不存在或与目标相同")
+                content: str | bytes = json.dumps(registry.load_entries(source), ensure_ascii=False)
+                fmt = "json"
+            elif isinstance(payload.get("content_b64"), str):
+                content = base64.b64decode(payload["content_b64"], validate=True)
+            else:
+                content = payload.get("content")
+                if not isinstance(content, str):
+                    raise HTTPException(status_code=400, detail="缺少导入内容")
+            rows = di.parse_rows(fmt, content, default_label=str(payload.get("default_label") or ""),
+                                 default_risk=str(payload.get("default_risk") or "high"))
+        except di.ImportError_ as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="文件内容无法解码") from exc
+        plan = di.plan_import(registry.load_entries(app_id), rows)
+        result = {"app_id": app_id, "dry_run": dry_run, "counts": plan["counts"], "changed": plan["changed"], "rows": plan["rows"][:2000],
+                  "rows_truncated": len(plan["rows"]) > 2000}
+        if not dry_run and plan["changed"]:
+            registry.write_entries(app_id, plan["entries"])
+            # Counts only: dictionary values never enter the audit stream.
+            _audit("admin_dictionary_import", app_id=app_id, added=plan["counts"].get("added", 0),
+                   updated=plan["counts"].get("updated", 0), rejected=plan["counts"].get("error", 0) + plan["counts"].get("blocked", 0))
+        return result
+
+    @app.get("/admin/apps/{app_id}/dictionary/export")
+    def export_dictionary(app_id: str, format: str = "csv") -> dict:
+        from tuomin_gateway import dictionary_import as di
+
+        _require_app(app_id)
+        try:
+            content, mime = di.export_entries(registry.load_entries(app_id), format)
+        except di.ImportError_ as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        _audit("admin_dictionary_export", app_id=app_id, format=format)
+        return {"name": f"{app_id}-dictionary.{format}", "content": content, "mime": mime}
 
     @app.post("/admin/apps/{app_id}/dictionary")
     def add_entry(app_id: str, entry: dict = Body(default={})) -> dict:
@@ -313,15 +410,26 @@ def register_admin(
             content={"error": {"code": exc.code, "message": exc.message, "detail": exc.detail}},
         )
 
+    def _own_gateway(request: Request, payload: dict | None = None) -> str:
+        # The gateway answering this request is the one that serves the app;
+        # port discovery could pick another running instance (e.g. demo mode).
+        explicit = (payload or {}).get("base_url")
+        return explicit or str(request.base_url).rstrip("/")
+
     @app.get("/admin/integrations/workbuddy")
-    def workbuddy_plan(app_id: str = "") -> dict:
+    def workbuddy_plan(request: Request, app_id: str = "") -> dict:
         from tuomin_gateway import workbuddy_onboarding as onboarding
 
-        result: dict = {"apps": registry.known_apps()}
+        result: dict = {
+            "apps": registry.known_apps(),
+            # Only apps the proxy can forward upstream are offered by the wizard.
+            "chat_apps": [name for name in registry.known_apps() if onboarding.chat_ready(registry.get_app(name))],
+        }
         if app_id:
             _require_valid_app_id(app_id)
             try:
-                result["plan"] = onboarding.plan(app_id)
+                onboarding.require_chat_app(app_id, registry.get_app(app_id))
+                result["plan"] = onboarding.plan(app_id, base_url=_own_gateway(request))
             except onboarding.OnboardingError as exc:
                 return _onboarding_error(exc)
         return result
@@ -351,18 +459,24 @@ def register_admin(
         return {"app_id": app_id, "created": existing is None, "entry": _public_app_entry(registry.get_app(app_id) or {})}
 
     @app.post("/admin/integrations/workbuddy/apply")
-    def workbuddy_apply(payload: dict = Body(default={})) -> dict:
+    def workbuddy_apply(request: Request, payload: dict = Body(default={})) -> dict:
+        if getattr(app.state, "demo", False):
+            raise HTTPException(status_code=403, detail="演示模式不能写入或验证外部客户端配置")
         from tuomin_gateway import workbuddy_onboarding as onboarding
 
         app_id = _require_valid_app_id(str(payload.get("app_id", "")).strip())
         if registry.get_app(app_id) is None:
             raise HTTPException(status_code=404, detail=f"app 不存在: {app_id}（请先在向导里创建项目 app）")
         try:
+            onboarding.require_chat_app(app_id, registry.get_app(app_id))
             result = onboarding.apply(
                 app_id,
                 api_key=str(payload.get("api_key", "")),
                 modes=payload.get("modes"),
-                base_url=payload.get("base_url") or None,
+                base_url=_own_gateway(request, payload),
+                # Entries written earlier for apps that cannot forward chats
+                # (e.g. the default file workbench) would only ever answer 502.
+                prune_apps=[name for name in registry.known_apps() if not onboarding.chat_ready(registry.get_app(name))],
             )
         except onboarding.OnboardingError as exc:
             return _onboarding_error(exc)
@@ -374,14 +488,21 @@ def register_admin(
         return result
 
     @app.post("/admin/integrations/workbuddy/verify")
-    def workbuddy_verify(payload: dict = Body(default={})) -> dict:
+    def workbuddy_verify(request: Request, payload: dict = Body(default={})) -> dict:
+        if getattr(app.state, "demo", False):
+            raise HTTPException(status_code=403, detail="演示模式不能写入或验证外部客户端配置")
         from tuomin_gateway import workbuddy_onboarding as onboarding
 
         app_id = _require_valid_app_id(str(payload.get("app_id", "")).strip())
         try:
-            return onboarding.verify(app_id, base_url=payload.get("base_url") or None)
+            result = onboarding.verify(app_id, base_url=_own_gateway(request, payload))
         except onboarding.OnboardingError as exc:
             return _onboarding_error(exc)
+        result["upstream_configured"] = onboarding.chat_ready(registry.get_app(app_id))
+        if not result["upstream_configured"]:
+            result["ok"] = False
+            result["note"] = "该应用没有上游模型地址，网关会以 502 拒绝 WorkBuddy 的对话；" + str(result.get("note", ""))
+        return result
 
     @app.get("/admin/settings")
     def settings() -> dict:

@@ -101,3 +101,37 @@ def test_verify_ok_and_detects_stale(tmp_path, fake_gateway):
     assert healthy["ok"] is True
     assert healthy["stale_entries"] == []
     assert {row["mode"] for row in healthy["entries"]} == {"masked", "demo", "auto"}
+
+
+def test_verify_rejects_legacy_entries_even_when_gateway_matches(tmp_path, fake_gateway):
+    models = tmp_path / "models.json"
+    legacy = ob.build_entries("wb_test", GATEWAY_URL, "sk-private", ["auto"])
+    legacy[0].update(supportsToolCall="True", supportsImages="False",
+                     supportsReasoning="True", useCustomProtocol="False",
+                     reasoning="{'defaultEffort': 'high'}")
+    models.write_text(json.dumps(legacy), encoding="utf-8")
+    result = ob.verify("wb_test", models_file=models)
+    assert result["gateway_serves_app"] and not result["stale_entries"]
+    assert not result["ok"] and len(result["invalid_entries"]) == 1
+    assert len(result["invalid_entries"][0]["format_errors"]) == 5
+    assert result["workbuddy_loaded"] is None
+    assert "sk-private" not in json.dumps(result)
+    ob.apply("wb_test", api_key=ob.PLACEHOLDER_API_KEY, models_file=models)
+    repaired = ob.verify("wb_test", models_file=models)
+    assert repaired["ok"] and repaired["invalid_entries"] == []
+    assert json.loads(models.read_text(encoding="utf-8"))[0]["apiKey"] == "sk-private"
+
+
+def test_verify_empty_models_is_not_reported_as_stale(tmp_path, fake_gateway):
+    result = ob.verify("wb_test", models_file=tmp_path / "models.json")
+    assert not result["ok"]
+    assert result["stale_entries"] == result["invalid_entries"] == []
+    assert any("尚未生成" in issue for issue in result["issues"])
+
+
+def test_verify_compares_exact_gateway_origin(tmp_path, fake_gateway):
+    models = tmp_path / "models.json"
+    entries = ob.build_entries("wb_test", GATEWAY_URL + "0", "sk-x", ["auto"])
+    models.write_text(json.dumps(entries), encoding="utf-8")
+    result = ob.verify("wb_test", models_file=models)
+    assert not result["ok"] and len(result["stale_entries"]) == 1

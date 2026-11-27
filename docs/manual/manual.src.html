@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tuomin 使用手册</title>
+<meta name="description" content="Tuomin 本地脱敏工作台使用手册：剪贴板、文本与文件脱敏、回填、词典、AI 工具接入与常见问题。" />
+<style>
+:root {
+  --bg: #f5f5f7; --card: #ffffff; --card-2: #f8f8fa; --ink: #1d1d1f; --muted: #6e6e73;
+  --line: #e2e2e7; --line2: #ededf1; --accent: #2f6fed; --accent-soft: #e8f0fe; --accent-2: #7c5cff;
+  --ok: #1f8f5a; --ok-soft: #e6f6ee; --warn: #b7791f; --warn-soft: #fff5e1; --danger: #d23b48; --danger-soft: #fdecee;
+  --role: #0f8a8a; --role-soft: #e3f5f5; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1e; --card: #242426; --card-2: #2a2a2d; --ink: #f2f2f7; --muted: #a0a0a8;
+    --line: #35353a; --line2: #2c2c30; --accent: #4f8bff; --accent-soft: #1f2a44; --accent-2: #9b85ff;
+    --ok: #3fbf7f; --ok-soft: #173126; --warn: #e0a644; --warn-soft: #33270f; --danger: #ff6b76; --danger-soft: #3b1f23;
+    --role: #3cc7c7; --role-soft: #123333; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1c1e; --card: #242426; --card-2: #2a2a2d; --ink: #f2f2f7; --muted: #a0a0a8;
+  --line: #35353a; --line2: #2c2c30; --accent: #4f8bff; --accent-soft: #1f2a44; --accent-2: #9b85ff;
+  --ok: #3fbf7f; --ok-soft: #173126; --warn: #e0a644; --warn-soft: #33270f; --danger: #ff6b76; --danger-soft: #3b1f23;
+  --role: #3cc7c7; --role-soft: #123333; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 20px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.75 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .kbd { font-family: var(--mono); font-size: .88em; }
+code { background: var(--card-2); border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; overflow-wrap: anywhere; }
+.kbd { display: inline-block; min-width: 1.6em; text-align: center; background: var(--card); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; line-height: 1.6; white-space: nowrap; }
+pre { background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font: 13px/1.6 var(--mono); }
+pre code { background: none; border: 0; padding: 0; }
+
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1240px; margin: 0 auto; }
+nav.toc { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 28px 18px 28px 24px; border-right: 1px solid var(--line); }
+.brand { display: flex; gap: 10px; align-items: center; margin-bottom: 22px; }
+.brand svg { width: 38px; height: 38px; flex: none; border-radius: 9px; box-shadow: 0 2px 8px rgba(47,111,237,.3); }
+.brand b { display: block; font-size: 16px; }
+.brand span { display: block; font-size: 12px; color: var(--muted); }
+nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+nav.toc li { margin: 1px 0; }
+nav.toc a { display: block; padding: 5px 10px; border-radius: 8px; color: var(--ink); font-size: 14px; }
+nav.toc a:hover { background: var(--card); text-decoration: none; }
+nav.toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav.toc .sub a { padding-left: 24px; font-size: 13px; color: var(--muted); }
+.theme-switch { margin-top: 20px; display: flex; gap: 6px; }
+.theme-switch button { flex: 1; font: inherit; font-size: 12px; padding: 5px 0; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; }
+.theme-switch button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+main { padding: 36px 48px 80px; min-width: 0; }
+.hero { background: linear-gradient(135deg, #2f6fed 0%, #6e4fff 100%); color: #fff; border-radius: 18px; padding: 34px 36px; margin-bottom: 36px; box-shadow: var(--shadow); }
+.hero h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.3; }
+.hero p { margin: 0; opacity: .92; max-width: 760px; }
+.hero .meta { margin-top: 16px; font-size: 13px; opacity: .85; }
+.hero .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.hero .chips a { color: #fff; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.hero .chips a:hover { background: rgba(255,255,255,.26); text-decoration: none; }
+
+section.chapter { margin: 0 0 56px; }
+h2 { font-size: 24px; margin: 0 0 6px; line-height: 1.35; padding-top: 6px; }
+h2 .no { color: var(--accent); margin-right: 8px; font-variant-numeric: tabular-nums; }
+h3 { font-size: 18px; margin: 30px 0 8px; }
+h4 { font-size: 15px; margin: 20px 0 6px; }
+.lead { color: var(--muted); margin: 0 0 18px; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 1.4em; margin: 10px 0; }
+li { margin: 4px 0; }
+
+figure { margin: 18px 0 24px; }
+figure .frame { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--card); }
+figure img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+figure.narrow { max-width: 620px; }
+figure.medium { max-width: 820px; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.window-bar { display: flex; align-items: center; gap: 7px; padding: 9px 12px; background: var(--card-2); border-bottom: 1px solid var(--line); }
+.window-bar i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.window-bar i:nth-child(1) { background: #ff5f57; } .window-bar i:nth-child(2) { background: #febc2e; } .window-bar i:nth-child(3) { background: #28c840; }
+.window-bar span { margin-left: 8px; font-size: 12px; color: var(--muted); }
+
+.callout { border-radius: 12px; padding: 12px 16px; margin: 16px 0; border: 1px solid; }
+.callout b:first-child { margin-right: 6px; }
+.tip { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.note { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.safe { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.danger { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+
+table { width: 100%; border-collapse: collapse; margin: 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line2); vertical-align: top; }
+th { background: var(--card-2); font-weight: 600; color: var(--muted); font-size: 13px; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.table-wrap { overflow-x: auto; }
+
+.steps { counter-reset: step; list-style: none; padding: 0; }
+.steps > li { position: relative; padding-left: 40px; margin: 12px 0; }
+.steps > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.flow .node { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 13px; position: relative; box-shadow: var(--shadow); }
+.flow .node b { display: block; font-size: 14px; margin-bottom: 4px; }
+.flow .node.local { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.flow .node.cloud { border-color: color-mix(in srgb, var(--accent-2) 45%, var(--line)); }
+.flow .tag { display: inline-block; font-size: 11px; border-radius: 999px; padding: 0 8px; margin-bottom: 6px; }
+.flow .local .tag { background: var(--ok-soft); color: var(--ok); }
+.flow .cloud .tag { background: color-mix(in srgb, var(--accent-2) 15%, transparent); color: var(--accent-2); }
+.ph { font-family: var(--mono); font-size: .86em; color: var(--role); background: var(--role-soft); border-radius: 5px; padding: 0 4px; white-space: nowrap; }
+.sens { color: var(--danger); background: var(--danger-soft); border-radius: 4px; padding: 0 3px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.cards .c { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.cards .c b { display: block; margin-bottom: 4px; }
+.cards .c span { color: var(--muted); font-size: 14px; }
+
+/* 示意图 */
+.mock { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 0; overflow: hidden; }
+.mock-label { font-size: 12px; color: var(--muted); padding: 6px 12px; border-bottom: 1px dashed var(--line); background: var(--card-2); }
+.menubar { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 6px 14px; font-size: 13px; background: color-mix(in srgb, var(--card-2) 70%, #c9d6ff 30%); }
+.menubar .icon { width: 22px; height: 22px; border-radius: 5px; background: color-mix(in srgb, var(--ink) 12%, transparent); display: grid; place-items: center; }
+.menu { width: 330px; max-width: 100%; margin: 0 14px 14px auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 5px; font-size: 13px; }
+.menu div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border-radius: 6px; }
+.menu div.hl { background: var(--accent); color: #fff; }
+.menu div.dim { color: var(--muted); }
+.menu hr { border: 0; border-top: 1px solid var(--line2); margin: 4px 6px; }
+.menu .k { color: inherit; opacity: .7; font-family: var(--mono); }
+.finder { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.finder .pane-l { padding: 18px; border-right: 1px solid var(--line2); display: grid; place-items: center; }
+.file { display: grid; justify-items: center; gap: 6px; font-size: 12px; }
+.file .doc { width: 54px; height: 66px; border-radius: 6px; background: linear-gradient(160deg, #3b7bff, #2f6fed); position: relative; box-shadow: var(--shadow); }
+.file .doc::after { content: "DOCX"; position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #fff; font: 700 10px var(--mono); }
+.file .doc.out { background: linear-gradient(160deg, #7c5cff, #2f6fed); }
+.file .sel { background: var(--accent); color: #fff; border-radius: 4px; padding: 0 6px; }
+.finder .pane-r { padding: 10px; }
+.ctx { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 5px; font-size: 13px; }
+.ctx div { padding: 3px 10px; border-radius: 6px; display: flex; justify-content: space-between; }
+.ctx div.hl { background: var(--accent); color: #fff; }
+.ctx hr { border: 0; border-top: 1px solid var(--line2); margin: 4px 6px; }
+.dock { display: flex; align-items: flex-end; justify-content: center; gap: 14px; padding: 22px 16px 16px; }
+.dock .app { width: 52px; height: 52px; border-radius: 13px; background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.dock .app.tuomin { background: linear-gradient(135deg, #3b7bff, #6e4fff); outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 3px; display: grid; place-items: center; color: #fff; font: 700 11px var(--mono); }
+.dock .drag { font-size: 12px; color: var(--muted); align-self: center; }
+
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 10; cursor: zoom-out; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.mobile-toc { display: none; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 40px; }
+
+@media (max-width: 980px) {
+  html { scroll-padding-top: 72px; }
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { display: none; }
+  .mobile-toc { display: block; position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .mobile-toc select { width: 100%; font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  main { padding: 20px 16px 60px; }
+  .hero { padding: 24px 20px; } .hero h1 { font-size: 24px; }
+  .flow { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: 1fr; }
+  .finder { grid-template-columns: 1fr; }
+  .finder .pane-l { border-right: 0; border-bottom: 1px solid var(--line2); }
+}
+@media print {
+  nav.toc, .mobile-toc, .theme-switch { display: none; }
+  .layout { display: block; } main { padding: 0; }
+  section.chapter { break-inside: auto; } figure { break-inside: avoid; }
+  .hero { box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<div class="mobile-toc"><select id="mobileToc" aria-label="跳转到章节"></select></div>
+<div class="layout">
+<nav class="toc" aria-label="目录">
+  <div class="brand">{{logo}}<div><b>Tuomin 使用手册</b><span>本地脱敏工作台 0.1.0</span></div></div>
+  <ol id="tocList">
+    <li><a href="#about">1. 认识 Tuomin</a></li>
+    <li><a href="#install">2. 安装与首次启动</a></li>
+    <li><a href="#tour">3. 界面一览</a></li>
+    <li><a href="#clipboard">4. 剪贴板：最快的用法</a></li>
+    <li class="sub"><a href="#selection">选中即脱敏</a></li>
+    <li><a href="#text">5. 文本脱敏</a></li>
+    <li><a href="#files">6. 文件脱敏</a></li>
+    <li class="sub"><a href="#drop">拖放、右键与命令行</a></li>
+    <li><a href="#refill">7. 回填还原</a></li>
+    <li><a href="#review">8. 核对与原值</a></li>
+    <li><a href="#dict">9. 本地词典</a></li>
+    <li><a href="#agents">10. 让 AI 工具直接调用</a></li>
+    <li class="sub"><a href="#workbuddy">聊天端点与 WorkBuddy</a></li>
+    <li><a href="#apps">11. 应用与档位</a></li>
+    <li><a href="#settings">12. 设置与快捷键</a></li>
+    <li><a href="#records">13. 记录</a></li>
+    <li><a href="#security">14. 安全与数据</a></li>
+    <li><a href="#faq">15. 常见问题</a></li>
+    <li><a href="#uninstall">16. 卸载</a></li>
+    <li><a href="#cheatsheet">附录：速查</a></li>
+  </ol>
+  <div class="theme-switch" role="group" aria-label="外观">
+    <button type="button" data-theme-choice="auto" aria-pressed="true">跟随系统</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+  </div>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Tuomin 本地脱敏工作台 · 使用手册</h1>
+  <p>把文字和文件里的单位名、人名、电话、账号、合同号等敏感信息，在你自己的电脑上换成 <span class="ph" style="background:rgba(255,255,255,.2);color:#fff">&lt;ORG_001&gt;</span> 这样的占位符，再交给 AI；拿回 AI 的回答后，同样在本机换回原文。</p>
+  <div class="meta">适用版本：0.1.0（构建 20261024.5）· macOS 26.5 及以上，Apple 芯片 · 文中截图均来自真实界面，示例数据为虚构</div>
+  <div class="chips">
+    <a href="#clipboard">3 步上手剪贴板</a><a href="#files">脱敏一个文件</a><a href="#agents">接入 Claude Code / Codex</a><a href="#dict">批量导入词典</a><a href="#faq">常见问题</a>
+  </div>
+</header>
+
+<section class="chapter" id="about">
+  <h2><span class="no">1</span>认识 Tuomin</h2>
+  <p class="lead">Tuomin 是一个只在本机运行的"脱敏 + 回填"工具。它不替你回答问题，而是让你可以放心地把材料交给任何 AI。</p>
+  <div class="flow" aria-label="工作流程">
+    <div class="node local"><span class="tag">本机</span><b>原文</b>甲方 <span class="sens">示例建设集团</span>，联系人 <span class="sens">张三</span></div>
+    <div class="node local"><span class="tag">本机</span><b>脱敏</b>识别敏感信息，换成占位符，对照表留在本机</div>
+    <div class="node cloud"><span class="tag">云端 AI</span><b>提问</b>甲方 <span class="ph">&lt;ORG_001&gt;</span>，联系人 <span class="ph">&lt;PERSON_001&gt;</span></div>
+    <div class="node cloud"><span class="tag">云端 AI</span><b>回答</b>建议 <span class="ph">&lt;ORG_001&gt;</span> 在签署前补充验收标准</div>
+    <div class="node local"><span class="tag">本机</span><b>回填</b>建议 示例建设集团 在签署前补充验收标准</div>
+  </div>
+  <div class="cards">
+    <div class="c"><b>只在本机</b><span>服务只监听 127.0.0.1，原值、对照表和词典都不离开这台电脑。</span></div>
+    <div class="c"><b>识别靠三层</b><span>规则（电话、证件、账号等）+ 你的词典 + 本地中文实体识别模型（Full 版内置）。</span></div>
+    <div class="c"><b>结果可还原</b><span>同一会话里同一原值始终对应同一个占位符，AI 的回答能准确换回原文，还原你当时的写法。</span></div>
+  </div>
+  <div class="callout note"><b>请注意</b>Tuomin 是数据最小化工具，不承诺零漏检。图片中的文字、扫描件 PDF 不会被识别；重要材料发出前，请在「核对与原值」里看一眼占位符覆盖是否完整。</div>
+</section>
+
+<section class="chapter" id="install">
+  <h2><span class="no">2</span>安装与首次启动</h2>
+  <ol class="steps">
+    <li>双击 <code>Tuomin-0.1.0-macos-arm64-…dmg</code>，把 <b>Tuomin</b> 拖到「应用程序」文件夹。<b>不要直接在 DMG 里运行</b>：那样 AI 工具接入写入的路径会在推出磁盘后失效。</li>
+    <li>从「应用程序」打开 Tuomin。如果提示"无法验证开发者"，到「系统设置 → 隐私与安全性」，在下方点「仍要打开」，只需一次。</li>
+    <li>首次启动会弹出欢迎向导：选择剪贴板使用的词典（默认「本机工作台」），按需勾选「登录时启动」，点「完成」。向导里也能直接跳到快捷键、AI 工具接入和词典导入。</li>
+    <li>菜单栏右上角出现 Tuomin 图标，说明服务已在后台运行。关闭窗口不会退出；要退出请点菜单栏图标 →「退出 Tuomin」，或在 Dock 图标上右键选「退出」，也可以按 <span class="kbd">⌘Q</span>。</li>
+  </ol>
+  <figure class="narrow"><div class="frame"><img src="{{img:02-onboarding}}" alt="首次启动欢迎向导" loading="lazy" /></div><figcaption><b>图 2-1</b> 首次启动向导：词典来源、登录时启动，以及快捷键、AI 工具、词典三个入口。</figcaption></figure>
+  <div class="callout tip"><b>不需要激活</b>本版本打开即可使用，没有授权码，也不联网下载任何东西。Full 版内置中文实体识别模型；Lite 版不含模型，只用规则和词典。</div>
+</section>
+
+<section class="chapter" id="tour">
+  <h2><span class="no">3</span>界面一览</h2>
+  <p class="lead">工作台窗口左侧是导航，分为「工作台」「接入」「管理」三组；底部显示当前模式和剪贴板会话。</p>
+  <figure><div class="frame"><div class="window-bar"><i></i><i></i><i></i><span>Tuomin 本地脱敏工作台</span></div><img src="{{img:01-home}}" alt="工作台首页" loading="lazy" /></div><figcaption><b>图 3-1</b> 首页。三个快捷入口，下面是剪贴板用法，快捷键随你的设置实时显示。</figcaption></figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>分组</th><th>页面</th><th>用来做什么</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="7">工作台</td><td>开始</td><td>入口与剪贴板用法</td></tr>
+      <tr><td>文本脱敏</td><td>粘贴一段文字，看脱敏前后对照（只预览，不保存对照表）</td></tr>
+      <tr><td>文件脱敏</td><td>Word、Excel、PPT、PDF、文本等文件，可导出保留排版的脱敏文件</td></tr>
+      <tr><td>文件回填</td><td>把 AI 改过的脱敏文件还原成原文</td></tr>
+      <tr><td>回答回填</td><td>把 AI 带占位符的回答还原成原文，包括 AI 工具通过 MCP 产生的「智能体会话」</td></tr>
+      <tr><td>核对与原值</td><td>原文、脱敏结果、AI 回答、回填结果并排核对；查看占位符对照表</td></tr>
+      <tr><td>记录</td><td>脱敏任务与调用账本（只有计数，不存正文）</td></tr>
+      <tr><td>接入</td><td>工具接入</td><td>一键把 Tuomin 接入 Claude Code、Codex 等 AI 工具；聊天端点；WorkBuddy 自定义模型</td></tr>
+      <tr><td rowspan="3">管理</td><td>本地词典</td><td>添加、批量导入、导出本单位专属名称；从脱敏结果学习</td></tr>
+      <tr><td>应用与档位</td><td>为不同工具建应用，选择脱敏档位</td></tr>
+      <tr><td>设置</td><td>剪贴板、快捷键、登录时启动、辅助功能权限</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="chapter" id="clipboard">
+  <h2><span class="no">4</span>剪贴板：最快的用法</h2>
+  <p class="lead">不用打开窗口。在任何应用里复制，按快捷键，粘贴给 AI；拿到回答再按一次，还原后粘回文档。</p>
+  <div class="mock" aria-label="菜单栏示意">
+    <div class="mock-label">示意：菜单栏 Tuomin 菜单</div>
+    <div class="menubar"><span>Wi-Fi</span><span class="icon" aria-hidden="true">▤</span><span>周一 09:30</span></div>
+    <div class="menu">
+      <div class="dim"><span>Tuomin 运行中 · 端口 8765</span></div>
+      <div class="dim"><span>检测器就绪</span></div>
+      <div class="dim"><span>已脱敏 3 处 · 单位 2 · 电话 1</span></div>
+      <hr />
+      <div class="hl"><span>脱敏剪贴板</span><span class="k">⌥⌘D</span></div>
+      <div><span>回填剪贴板</span><span class="k">⌥⌘R</span></div>
+      <div><span>选中文字</span><span class="k">▸</span></div>
+      <div><span>剪贴板会话：09:12 开始 · 4 段 · 9 个实体</span><span class="k">▸</span></div>
+      <div><span>词典来源：本机工作台</span><span class="k">▸</span></div>
+      <div><span>查看最近结果</span><span></span></div>
+      <div><span>打开工作台</span><span class="k">⌘O</span></div>
+      <div><span>复制网关地址</span><span></span></div>
+      <hr />
+      <div><span>登录时启动</span><span></span></div>
+      <hr />
+      <div><span>退出 Tuomin</span><span class="k">⌘Q</span></div>
+    </div>
+  </div>
+  <ol class="steps">
+    <li>在微信、邮件、Word 等任何地方复制一段文字，按 <span class="kbd">⌥⌘D</span>（或点菜单栏「脱敏剪贴板」）。剪贴板里的内容被替换成脱敏版，并提示"已脱敏 N 处"。</li>
+    <li>粘贴到任意 AI 对话框提问。</li>
+    <li>复制 AI 的回答，按 <span class="kbd">⌥⌘R</span>（或点「回填剪贴板」），再粘贴到你的文档。还原的是你当时的写法：写的是简称就还原成简称。</li>
+  </ol>
+  <h3>会话：让占位符保持一致</h3>
+  <ul>
+    <li>同一个剪贴板会话里，多次复制的同一个名称始终是同一个占位符，所以可以分几段发给 AI。</li>
+    <li>空闲 8 小时（可在设置里改）后自动开始新会话。菜单「剪贴板会话」里可以新建会话、结束并清除，或在工作台查看对照表。</li>
+    <li>回答要在<b>产生它的那个会话</b>里回填。新会话里回填旧回答，可能和同名占位符混淆。</li>
+  </ul>
+  <div class="callout note"><b>不会覆盖剪贴板的情况</b>检测器未就绪、含禁止外发的内容、回答里有未知或被改写的占位符、处理期间剪贴板被其他应用改了。此时剪贴板保持原样，菜单栏和通知会说明原因。</div>
+
+  <h3 id="selection">选中即脱敏（不用先复制）</h3>
+  <p>在「设置」里给下面三个动作绑定快捷键，就可以直接对选中的文字操作：</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>动作</th><th>效果</th><th>适合</th></tr></thead>
+    <tbody>
+      <tr><td>脱敏选中文字</td><td>脱敏结果放进剪贴板，原文不动</td><td>选中一段话，马上粘贴给 AI</td></tr>
+      <tr><td>选中脱敏并替换</td><td>选中的内容直接变成脱敏版，你原来的剪贴板会被恢复</td><td>在文档里就地处理一段内容</td></tr>
+      <tr><td>选中回填并替换</td><td>选中的 AI 回答直接变成原文，原文<b>不会</b>留在剪贴板</td><td>把粘进文档的 AI 回答就地还原</td></tr>
+    </tbody>
+  </table></div>
+  <p>这三项需要 macOS 的「辅助功能」权限（用来模拟一次 <span class="kbd">⌘C</span> / <span class="kbd">⌘V</span>）：</p>
+  <ol class="steps">
+    <li>第一次按快捷键时，系统会弹出授权提示；或在「设置」里点「请求授权」。</li>
+    <li>在「系统设置 → 隐私与安全性 → 辅助功能」里打开 Tuomin 的开关。</li>
+    <li>回到原来的应用，选中文字，再按一次快捷键。</li>
+  </ol>
+  <div class="callout tip"><b>不授权也没关系</b>其他快捷键和菜单动作照常可用。Tuomin 只在你按下快捷键的那一刻读取一次剪贴板，从不在后台监听。</div>
+</section>
+
+<section class="chapter" id="text">
+  <h2><span class="no">5</span>文本脱敏</h2>
+  <p class="lead">粘贴一段文字，立刻看到哪些内容被识别、换成了什么。适合核对规则和词典的效果。</p>
+  <figure><div class="frame"><img src="{{img:03-try}}" alt="文本脱敏页" loading="lazy" /></div><figcaption><b>图 5-1</b> 左侧红色是识别出的敏感信息；右侧是真正会发出去的内容。<span class="ph">&lt;PARTYA_001&gt;</span> 这类青色标签表示交易角色（甲方、乙方、担保人）。</figcaption></figure>
+  <ul>
+    <li><b>示例</b>：一键填入合同、投资、个人信息、诉讼等示例文本。</li>
+    <li><b>档位</b>：决定哪些类别被替换（见第 11 章）。勾选「全部档位」可看到所有场景、档位与敏感级。</li>
+    <li><b>统计</b>：识别项、替换为占位符、不可逆泛化（例如金额换成区间，无法还原）、禁止外发的数量。</li>
+  </ul>
+  <div class="callout note"><b>这里只预览</b>文本脱敏不保存对照表，也不能回填。要回填，请用剪贴板或文件脱敏。</div>
+</section>
+
+<section class="chapter" id="files">
+  <h2><span class="no">6</span>文件脱敏</h2>
+  <p class="lead">原文件不会被修改。Word、Excel、PPT 可以导出保留原排版的脱敏文件；其他格式输出脱敏后的文本。</p>
+  <ol class="steps">
+    <li>点「选择文件」，在「使用词典」里选应用（默认「本机工作台」）。不选词典时只能本地预览，结果禁止外发。</li>
+    <li>二选一：
+      <ul>
+        <li><b>解析并脱敏</b>：输出脱敏后的文本（Markdown），适合把内容粘给 AI。</li>
+        <li><b>导出原格式脱敏文件</b>：生成同样排版的 .docx / .xlsx / .pptx，适合直接上传给 AI 或发给同事。</li>
+      </ul>
+    </li>
+    <li>看<b>出站闸门</b>：绿色"通过"才表示可以交给在线 AI；红色会列出原因（例如含身份证号这类禁止外发的内容）。</li>
+    <li>点「保存脱敏文件…」或「保存脱敏文本…」选择保存位置。点「把识别出的名称加入词典…」可以让下次识别更稳（见 9.3）。</li>
+  </ol>
+  <figure><div class="frame"><img src="{{img:04-files}}" alt="文件脱敏结果" loading="lazy" /></div><figcaption><b>图 6-1</b> 解析并脱敏的结果：出站闸门、检测器、各类别计数和脱敏后的文本。处理长文件时会出现「终止」按钮。</figcaption></figure>
+  <h3>支持的格式</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>格式</th><th>原格式导出</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>Word .docx</td><td>✓</td><td>正文、表格、页眉页脚、批注、脚注尾注、修订记录都会处理；修订作者名会匿名</td></tr>
+      <tr><td>Word .doc</td><td>✓（转为 .docx）</td><td>需要本机装有 LibreOffice，或先用 Word 另存为 .docx</td></tr>
+      <tr><td>Excel .xlsx</td><td>✓</td><td>单元格、批注、图表、透视表缓存、外部链接缓存、自动筛选条件；长数字会改为文本以防精度丢失</td></tr>
+      <tr><td>Excel .xls</td><td>✓（转为 .xlsx）</td><td>同 .doc，需要 LibreOffice</td></tr>
+      <tr><td>PowerPoint .pptx</td><td>✓</td><td>幻灯片、备注、图表与图表内嵌的工作簿、形状名称</td></tr>
+      <tr><td>PDF、txt、md、csv、json、yaml、xlsm</td><td>—</td><td>输出脱敏后的文本；扫描件 PDF 需要 OCR，暂不支持</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout note"><b>会被拦下的文件</b>含宏、带打开密码、带数字签名、含无法处理的嵌入对象（如 WPS 公式）时会停止并说明原因。Word 里的嵌入对象可以选择「移除嵌入对象后继续」。公式、工作表名里出现电话、证件号这类强敏感值时也会拦下，并指出具体位置，改成普通文字后重试即可。</div>
+
+  <h3 id="drop">不开窗口：拖放、右键与命令行</h3>
+  <div class="finder mock" aria-label="Finder 与 Dock 示意">
+    <div class="pane-l">
+      <div class="mock-label" style="align-self:start;justify-self:stretch;margin:-18px -18px 14px">示意：Finder 右键「服务」</div>
+      <div class="file"><div class="doc"></div><span class="sel">采购合同.docx</span></div>
+    </div>
+    <div class="pane-r">
+      <div class="ctx">
+        <div><span>打开</span></div><div><span>打开方式</span><span>▸</span></div><hr />
+        <div><span>拷贝</span></div><div><span>共享…</span></div><hr />
+        <div class="hl"><span>服务 / 快速操作</span><span>▸</span></div>
+        <div style="padding-left:22px" class="hl"><span>用 Tuomin 脱敏</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mock" style="margin-top:12px" aria-label="Dock 拖放示意">
+    <div class="mock-label">示意：把文件拖到 Dock 或菜单栏的 Tuomin 图标上</div>
+    <div class="dock"><div class="file"><div class="doc"></div><span>采购合同.docx</span></div><span class="drag">拖到 →</span><div class="app"></div><div class="app tuomin">T</div><div class="app"></div><span class="drag">得到 →</span><div class="file"><div class="doc out"></div><span>采购合同（脱敏）.docx</span></div></div>
+  </div>
+  <ul>
+    <li><b>拖到 Dock 图标或菜单栏图标</b>：Word、Excel、PPT、PDF、文本文件都可以，一次可拖多个。</li>
+    <li><b>Finder 右键 →「服务」（新系统为「快速操作」）→「用 Tuomin 脱敏」</b>。看不到这一项时，到「系统设置 → 键盘 → 键盘快捷键 → 服务」里勾选「用 Tuomin 脱敏」。</li>
+    <li>结果保存在原文件旁：<code>名称（脱敏）.docx</code>；PDF 和文本输出 <code>名称（脱敏）.md</code>。已有同名文件时自动编号，不覆盖；出站闸门未通过的不会生成文件。</li>
+    <li>完成后会收到通知，点通知在 Finder 中显示结果。回填时在「文件回填」里选这次任务。</li>
+  </ul>
+  <p>批量处理或在服务器上使用时，可以用命令行（需要从源码安装 tuomin-gateway）：</p>
+<pre><code>tuomin-gateway redact-file 合同.docx 台账.xlsx --out-dir 脱敏输出
+tuomin-gateway redact-file 报告.pdf --app workbench --json</code></pre>
+  <p>Tuomin 正在运行时，命令行直接使用它；没运行时在命令行进程内处理。</p>
+</section>
+
+<section class="chapter" id="refill">
+  <h2><span class="no">7</span>回填还原</h2>
+  <p class="lead">对照表保存在本机，回填时只要选对"任务"，不需要口令或恢复包。文件任务可在一年内回填；剪贴板会话和智能体会话请在 24 小时内回填。</p>
+  <h3>文件回填</h3>
+  <p>AI 把脱敏文件改写后发回来，在「文件回填」里选择改写后的文件和对应任务，点回填。原格式文件（docx/xlsx/pptx）回填后仍保留排版。</p>
+  <figure class="medium"><div class="frame"><img src="{{img:05-refill}}" alt="文件回填" loading="lazy" /></div><figcaption><b>图 7-1</b> 文件回填：选择文件和脱敏时的任务。</figcaption></figure>
+  <h3>回答回填</h3>
+  <ol class="steps">
+    <li>把 AI 的回答粘进文本框（或导入 .md / .txt）。</li>
+    <li>在「对应任务」里选脱敏时的那次任务。</li>
+    <li>点「本地回填」，下方显示还原后的回答和每个占位符的使用次数。</li>
+  </ol>
+  <figure><div class="frame"><img src="{{img:06-answer}}" alt="回答回填" loading="lazy" /></div><figcaption><b>图 7-2</b> 回答回填：6 个占位符全部还原。</figcaption></figure>
+  <h3>智能体会话</h3>
+  <p>Claude Code、Codex 等 AI 工具通过 Tuomin 脱敏时（见第 10 章），每次对话是一个「智能体会话」。在「对应任务」下拉的「智能体会话」分组里，按时间选中对应的那一项即可还原 AI 的回答。</p>
+  <figure><div class="frame"><img src="{{img:06b-answer-agent}}" alt="智能体会话回填" loading="lazy" /></div><figcaption><b>图 7-3</b> 选择智能体会话回填 AI 工具产生的回答。</figcaption></figure>
+  <div class="callout note"><b>回填被阻断时</b>"未知占位符"通常是选错了任务；"占位符被改写"是 AI 改动了编号或括号（例如写成 <code>&lt;ORG 001&gt;</code>），修正后再回填。回答里一个占位符都没有时，会请你确认后再按原文返回。</div>
+  <div class="callout tip"><b>换电脑或长期归档</b>在「文件脱敏」页可以导出加密的恢复包（.tuominmap），回填页展开「改用恢复包文件」即可使用。日常在本机回填不需要它。</div>
+</section>
+
+<section class="chapter" id="review">
+  <h2><span class="no">8</span>核对与原值</h2>
+  <p class="lead">发出去之前最后检查一遍：原文、脱敏结果、AI 回答、回填结果并排对照；需要时显示占位符对应的原值。</p>
+  <figure><div class="frame"><img src="{{img:07-preview}}" alt="核对与原值" loading="lazy" /></div><figcaption><b>图 8-1</b> 选中任务后点「显示所选任务的原值」，下方出现占位符与原值的对照表。</figcaption></figure>
+  <div class="callout danger"><b>敏感区域</b>对照表显示的是真实原值。离开页面、切换窗口或 90 秒无操作会自动锁定，内容不写入任何缓存或日志。请勿截图或转发。</div>
+</section>
+
+<section class="chapter" id="dict">
+  <h2><span class="no">9</span>本地词典</h2>
+  <p class="lead">规则能识别电话、证件、账号这类有固定格式的信息；单位、客户、项目的名称和简称，最可靠的办法是放进词典。</p>
+  <h3>9.1 添加与管理词条</h3>
+  <p>在「词典所属应用」里选应用（默认「本机工作台」，剪贴板和文件脱敏都用它），填写名称、类型、别名和风险等级后点「添加」。同一实体的简称写在别名里，回填时按你当时的写法还原。</p>
+  <figure><div class="frame"><img src="{{img:10c-dict-entries}}" alt="词条列表" loading="lazy" /></div><figcaption><b>图 9-1</b> 词条列表，可导出 CSV / JSON。导出文件含原值，请妥善保存。</figcaption></figure>
+  <h3>9.2 批量导入</h3>
+  <ol class="steps">
+    <li>「来源」选粘贴文本、选择文件（CSV / Excel .xlsx / 导出的 JSON）或「从其他应用复制」。</li>
+    <li>粘贴时每行一个：<code>名称,类型,别名|别名,风险</code>，后三项可以省略；只写名称时，在「缺省类型」里选类型。</li>
+    <li>点「预览」，逐行查看结果；确认没问题后点「确认导入」，只有没问题的行会写入。</li>
+  </ol>
+  <figure><div class="frame"><img src="{{img:10-dict-import}}" alt="批量导入预览" loading="lazy" /></div><figcaption><b>图 9-2</b> 导入预览：新增、合并别名、未通过质量检查（单个字"市"会误伤正文，被拦下）。</figcaption></figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>类型写法</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><code>ORG</code> 或 单位 / 公司 / 机构</td><td>单位名称</td></tr>
+      <tr><td><code>PERSON</code> 或 人名 / 姓名 / 联系人</td><td>人名</td></tr>
+      <tr><td><code>PROJECT</code> 或 项目 / 工程</td><td>项目名称</td></tr>
+      <tr><td><code>SUPPLIER</code> 或 供应商；<code>CUSTOMER</code> 或 客户</td><td>供应商、客户</td></tr>
+      <tr><td><code>ADDRESS</code> 或 地址</td><td>地址</td></tr>
+      <tr><td>其他大写英文，如 <code>CONTRACT_ID</code></td><td>自定义类别</td></tr>
+    </tbody>
+  </table></div>
+  <p>Excel / CSV 第一行可以写表头「名称、类型、别名、风险」（顺序不限），没有表头时按这个顺序读取。风险等级可写 low / medium / high / critical 或 低 / 中 / 高 / 极高，默认 high。</p>
+  <h3>9.3 从脱敏结果学习</h3>
+  <p>选一次文件脱敏或智能体会话，点「查找新名称」，列出本次识别出、词典里还没有的单位、人名、地址等。勾选、调整类型后点「加入词典」。文件脱敏完成后，点「把识别出的名称加入词典…」会直接跳到这里。</p>
+  <figure><div class="frame"><img src="{{img:10b-dict-learn}}" alt="从脱敏结果学习" loading="lazy" /></div><figcaption><b>图 9-3</b> 从一次文件脱敏中找到 3 个词典里还没有的名称。</figcaption></figure>
+</section>
+
+<section class="chapter" id="agents">
+  <h2><span class="no">10</span>让 AI 工具直接调用</h2>
+  <p class="lead">在 Claude Code、Codex、Cursor、Claude Desktop、WorkBuddy 的对话里，让 AI 先调用 Tuomin 脱敏，再处理材料。</p>
+  <figure><div class="frame"><img src="{{img:09-agents}}" alt="AI 工具一键接入" loading="lazy" /></div><figcaption><b>图 10-1</b> 「工具接入」页：每个客户端一张卡片，写入后显示"已接入"；下方是自检结果。</figcaption></figure>
+  <ol class="steps">
+    <li>打开「工具接入」，找到你用的客户端，点「写入」。支持 skill 的客户端会同时安装 <code>tuomin-guard</code> skill（教 AI 正确使用脱敏、不碰占位符）。</li>
+    <li>点「自检」，四步全部打勾即说明配置可用。</li>
+    <li>按卡片上的提示重启客户端。之后在对话里说"先用 tuomin 脱敏这段材料再分析"即可。</li>
+    <li>AI 的回答里有占位符时，到「回答回填」选择对应的「智能体会话」还原（见 7 章）。</li>
+  </ol>
+  <div class="table-wrap"><table>
+    <thead><tr><th>客户端</th><th>写入位置</th><th>Skill</th><th>生效方式</th></tr></thead>
+    <tbody>
+      <tr><td>Claude Code</td><td>用户级 MCP（优先用 <code>claude mcp add</code>）</td><td>自动安装</td><td>新开会话，<code>/mcp</code> 可查看</td></tr>
+      <tr><td>Codex</td><td><code>~/.codex/config.toml</code></td><td>自动安装</td><td>重启 Codex</td></tr>
+      <tr><td>Cursor</td><td><code>~/.cursor/mcp.json</code></td><td>无用户级 skill</td><td>在 MCP 设置里确认启用</td></tr>
+      <tr><td>Claude Desktop</td><td><code>claude_desktop_config.json</code></td><td>点「下载 skill」后在 App 内上传</td><td>完全退出后重开</td></tr>
+      <tr><td>WorkBuddy</td><td><code>~/.workbuddy/mcp.json</code></td><td>自动安装</td><td>在「连接器」里确认启用</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout safe"><b>安全设计</b>写入的配置里只有 Tuomin 的启动路径，没有任何密码或令牌。AI 只能脱敏，不能回填，也看不到原值；同一次对话里多次脱敏使用同一套占位符。写入前会自动备份原配置，「移除」只删除 Tuomin 自己写入的那一项。</div>
+  <ul>
+    <li><b>智能体使用的词典</b>：默认与「本机工作台」相同，可在卡片顶部切换后点「应用」。</li>
+    <li><b>Tuomin 没开时</b>：AI 第一次调用会在后台自动启动已安装的 Tuomin。</li>
+    <li><b>其他客户端</b>：展开「MCP 启动命令」，复制命令配置到任何支持 STDIO MCP 的工具。</li>
+    <li><b>更换凭证</b>：随时可以更换智能体凭证，已接入的客户端无需改动。</li>
+  </ul>
+
+  <h3 id="workbuddy">聊天端点与 WorkBuddy 自定义模型</h3>
+  <p>另一种接法是把 Tuomin 当成"模型地址"：客户端照常发请求，Tuomin 在中间脱敏、转发给真正的模型，再把回答还原。每个应用有三个端点：</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>端点</th><th>效果</th><th>适合</th></tr></thead>
+    <tbody>
+      <tr><td>masked</td><td>回答全程保留占位符，需要到 Tuomin 回填</td><td>自检、检查覆盖情况</td></tr>
+      <tr><td>demo</td><td>思维链保留占位符，正文自动还原</td><td>演示"脱敏确实发生了"</td></tr>
+      <tr><td>auto</td><td>全程自动还原，使用体验与直连模型相同</td><td>日常使用</td></tr>
+    </tbody>
+  </table></div>
+  <figure><div class="frame"><img src="{{img:09b-endpoints}}" alt="各应用的聊天端点" loading="lazy" /></div><figcaption><b>图 10-2</b> 各应用的聊天端点，端点里不含凭证。</figcaption></figure>
+  <p><b>WorkBuddy</b> 可以用向导一步完成：在下方「一键创建」新建项目应用（填上游模型地址与模型，默认 DeepSeek），选中它，填写上游 API key，点「生成并写入 WorkBuddy」，再点「校验」。WorkBuddy 会自动重载，模型下拉里选「&lt;应用&gt;·脱敏·无感回填」即可。</p>
+  <figure><div class="frame"><img src="{{img:09c-workbuddy}}" alt="WorkBuddy 接入向导" loading="lazy" /></div><figcaption><b>图 10-3</b> WorkBuddy 向导：确认网关、预览将写入的三个条目。</figcaption></figure>
+  <div class="callout note"><b>只有配置了上游模型的应用才能接入</b>首次启动自带的「本机工作台」「剪贴板」是给文件和剪贴板用的，没有上游模型，下拉里会显示为不可接入。API key 只写进 WorkBuddy 自己的配置，不进 Tuomin、不进日志。</div>
+</section>
+
+<section class="chapter" id="apps">
+  <h2><span class="no">11</span>应用与档位</h2>
+  <p class="lead">每个接入的工具对应一个"应用"，决定用哪本词典、脱敏有多严格。桌面使用一般用默认的「本机工作台」即可。</p>
+  <figure><div class="frame"><img src="{{img:11-apps}}" alt="应用与档位" loading="lazy" /></div><figcaption><b>图 11-1</b> 应用列表与新建应用。新应用会自动获得一本空词典。</figcaption></figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>档位</th><th>效果</th></tr></thead>
+    <tbody>
+      <tr><td>通用（推荐）</td><td>识别到的全部替换，可以完整回填。文件与剪贴板默认使用。</td></tr>
+      <tr><td>合同审查</td><td>保留合同分析需要的结构，交易各方按角色（甲方、乙方、担保人）占位。</td></tr>
+      <tr><td>投资项目</td><td>适合投资尽调材料。</td></tr>
+      <tr><td>诉讼文书</td><td>法院、案号等公开信息按需保留，当事人信息替换。</td></tr>
+      <tr><td>严格</td><td>更多类别一律替换，适合最敏感的材料。</td></tr>
+    </tbody>
+  </table></div>
+  <p>部分档位会把金额换成区间、把地址概括到省市（"不可逆泛化"），这些内容回填时无法还原；需要完整回填时请用「通用」。</p>
+</section>
+
+<section class="chapter" id="settings">
+  <h2><span class="no">12</span>设置与快捷键</h2>
+  <figure><div class="frame"><img src="{{img:12-settings}}" alt="设置页" loading="lazy" /></div><figcaption><b>图 12-1</b> 剪贴板与快捷键：录制控件、辅助功能状态、登录时启动。</figcaption></figure>
+  <ul>
+    <li><b>录制快捷键</b>：点输入框后直接按组合键；<span class="kbd">Esc</span> 取消，<span class="kbd">Delete</span> 清除。也可以手写，如 <code>alt+cmd+d</code>。</li>
+    <li><b>规则</b>：字母、数字、标点要搭配 <span class="kbd">⌘</span>、<span class="kbd">⌥</span> 或 <span class="kbd">⌃</span>；<span class="kbd">F1</span>–<span class="kbd">F12</span> 也要搭配修饰键；<span class="kbd">F13</span>–<span class="kbd">F20</span> 可以单独使用。快捷键按键盘的物理位置记录，切换输入法不影响。</li>
+    <li><b>冲突</b>：两个动作不能用同一组合；被其他应用占用时会在设置页提示，换一个即可。保存后菜单栏会显示新的快捷键。</li>
+    <li><b>剪贴板使用的词典</b>与<b>空闲多久后新建会话</b>也在这里调整；切换词典从下一段脱敏开始生效。</li>
+    <li><b>登录时启动</b>：开机后自动在菜单栏运行。</li>
+  </ul>
+</section>
+
+<section class="chapter" id="records">
+  <h2><span class="no">13</span>记录</h2>
+  <p>「记录」列出每次文件脱敏任务（时间、文件名、格式、各类别数量、任务号），以及每次调用的入口、应用、耗时、字符数和是否阻断。这里<b>不保存正文和原值</b>。删除任务会同时删除它的对照表，之后无法再回填。</p>
+  <figure><div class="frame"><img src="{{img:08-records}}" alt="记录" loading="lazy" /></div><figcaption><b>图 13-1</b> 文件任务列表。</figcaption></figure>
+</section>
+
+<section class="chapter" id="security">
+  <h2><span class="no">14</span>安全与数据</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>内容</th><th>保存位置</th><th>保护方式</th></tr></thead>
+    <tbody>
+      <tr><td>占位符对照表（原值）</td><td><code>~/Library/Application Support/Tuomin/mappings</code></td><td>AES-256-GCM 加密，主密钥在你的"登录"钥匙串里</td></tr>
+      <tr><td>词典</td><td>同目录下 <code>dictionaries/</code></td><td>仅本机用户可读</td></tr>
+      <tr><td>应用配置、智能体凭证</td><td>同目录下 <code>apps.json</code>、<code>agent-tokens.json</code></td><td>仅本机用户可读；配置里只存凭证的哈希</td></tr>
+      <tr><td>任务与调用记录</td><td>同目录</td><td>只有计数和版本，不含正文</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>服务只监听 <code>127.0.0.1</code>，局域网里的其他设备访问不到。</li>
+    <li>管理操作需要管理凭证；在原生窗口里自动注入，用外部浏览器打开时才需要手动填写。不要把凭证放进网址、聊天或截图。</li>
+    <li>回填写回剪贴板时带"隐私"标记，多数剪贴板历史工具不会记录，但无法保证所有工具都遵守。</li>
+    <li>保留期：文件任务的对照表默认保存一年；剪贴板会话和智能体会话的对照表保存 24 小时。到期自动清理，删除任务立即清除。</li>
+  </ul>
+  <div class="callout note"><b>能力边界</b>图片里的文字、扫描件 PDF 不识别；只有经过 Tuomin 的内容会被脱敏，AI 工具直接读取的文件、网页和其他连接器不在保护范围。出站闸门"通过"表示本机检测和策略检查通过，不是零漏检承诺。</div>
+</section>
+
+<section class="chapter" id="faq">
+  <h2><span class="no">15</span>常见问题</h2>
+  <h4>打开时提示"无法验证开发者"</h4>
+  <p>到「系统设置 → 隐私与安全性」点「仍要打开」，只需一次。</p>
+  <h4>按快捷键没反应</h4>
+  <p>确认菜单栏有 Tuomin 图标；到「设置」看快捷键是否启用、是否提示冲突。"选中文字"三项还需要辅助功能权限。</p>
+  <h4>「选中脱敏并替换」提示没有读取到选中文字</h4>
+  <p>先确认文字已选中；少数应用（如部分终端、受保护的输入框）不支持复制，改用普通剪贴板动作。</p>
+  <h4>Finder 右键里找不到「用 Tuomin 脱敏」</h4>
+  <p>先从「应用程序」打开一次 Tuomin，再到「系统设置 → 键盘 → 键盘快捷键 → 服务」里勾选它。新系统里它在「快速操作」子菜单中。</p>
+  <h4>AI 工具里看不到 Tuomin 的工具</h4>
+  <p>在「工具接入」点「自检」；四步都通过后重启客户端。卡片显示"指向旧位置"时，说明 Tuomin 被移动过，点「重新写入」。不要从 DMG 或「下载」文件夹运行 Tuomin。</p>
+  <h4>回填时报"未知占位符"</h4>
+  <p>通常是选错了任务或会话。剪贴板回填只能还原当前会话产生的占位符；AI 工具的回答请在「回答回填」选择对应的智能体会话。剪贴板与智能体会话的对照表 24 小时后清理，超时后无法再还原。</p>
+  <h4>文件脱敏被拦下</h4>
+  <p>错误提示会写明原因和建议：含宏的另存为普通 .docx / .xlsx / .pptx；有打开密码的先去掉密码；公式或工作表名里有敏感值的改成普通文字。拿不准时先用「解析并脱敏」得到文本版。</p>
+  <h4>.doc / .xls 提示没有转换程序</h4>
+  <p>安装 LibreOffice，或用 Word / Excel 另存为 .docx / .xlsx 后再处理。</p>
+  <h4>出站闸门显示"禁止外发"</h4>
+  <p>内容里有档位规定不能外发的类别（例如身份证号、密钥）。检查原文，必要时手动删去后重试。</p>
+  <h4>退出时弹出"其他工具最近仍在使用 Tuomin"</h4>
+  <p>最近几秒有 AI 工具或其他程序通过 Tuomin 处理过内容，退出会让它们连不上。确认没有正在进行的工作后点「退出 Tuomin」，否则点「继续运行」。正在处理文件时退出会中断这次处理，不会生成结果。</p>
+  <h4>WorkBuddy 显示写入成功但模型列表里没有</h4>
+  <p>在 Tuomin 向导里点「校验」；确认选的是配置了上游模型的项目应用。旧版本写入的条目格式不兼容时，重新点「生成并写入」会自动修正。</p>
+</section>
+
+<section class="chapter" id="uninstall">
+  <h2><span class="no">16</span>卸载</h2>
+  <ol class="steps">
+    <li>点菜单栏 Tuomin 图标 →「退出 Tuomin」（或在 Dock 图标上右键退出）。</li>
+    <li>在「工具接入」里把已接入的 AI 客户端逐个「移除」（可选，但推荐）。</li>
+    <li>把「应用程序」里的 Tuomin 移到废纸篓。</li>
+    <li>如需同时清除数据（对照表、词典、记录），删除 <code>~/Library/Application Support/Tuomin</code> 文件夹，并在"钥匙串访问"里删除名为 <code>com.tuomin.workbench.mapping-store.v1</code> 的项目。删除后已脱敏的文件将无法再回填。</li>
+  </ol>
+</section>
+
+<section class="chapter" id="cheatsheet">
+  <h2><span class="no">附</span>速查</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>操作</th><th>默认快捷键</th><th>菜单栏位置</th></tr></thead>
+    <tbody>
+      <tr><td>脱敏剪贴板</td><td><span class="kbd">⌥⌘D</span></td><td>脱敏剪贴板</td></tr>
+      <tr><td>回填剪贴板</td><td><span class="kbd">⌥⌘R</span></td><td>回填剪贴板</td></tr>
+      <tr><td>脱敏选中文字 / 选中脱敏并替换 / 选中回填并替换</td><td>未绑定，在设置里录制</td><td>选中文字 ▸</td></tr>
+      <tr><td>打开工作台</td><td><span class="kbd">⌘O</span>（菜单展开时）</td><td>打开工作台</td></tr>
+    </tbody>
+  </table></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>常见占位符</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><span class="ph">&lt;ORG_001&gt;</span></td><td>单位</td></tr>
+      <tr><td><span class="ph">&lt;PERSON_001&gt;</span></td><td>人名</td></tr>
+      <tr><td><span class="ph">&lt;CONTACT_001&gt;</span></td><td>电话、邮箱等联系方式</td></tr>
+      <tr><td><span class="ph">&lt;ADDRESS_001&gt;</span></td><td>地址</td></tr>
+      <tr><td><span class="ph">&lt;CONTRACT_ID_001&gt;</span></td><td>合同编号</td></tr>
+      <tr><td><span class="ph">&lt;AMOUNT_001&gt;</span></td><td>金额</td></tr>
+      <tr><td><span class="ph">&lt;PARTYA_001&gt;</span>、<span class="ph">&lt;PARTYB_001&gt;</span>、<span class="ph">&lt;GUARANTOR_001&gt;</span></td><td>甲方、乙方、担保人等交易角色</td></tr>
+    </tbody>
+  </table></div>
+  <footer>Tuomin 本地脱敏工作台 0.1.0 · 构建 20261024.5 · 手册中的人物、单位、编号与金额均为虚构，仅用于演示。</footer>
+</section>
+</main>
+</div>
+<div class="lightbox" id="lightbox" role="dialog" aria-label="放大查看截图"><img alt="" /></div>
+<script>
+(() => {
+  const links = [...document.querySelectorAll('#tocList a')];
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const select = document.getElementById('mobileToc');
+  for (const a of links) { const o = document.createElement('option'); o.value = a.getAttribute('href'); o.textContent = a.textContent; select.appendChild(o); }
+  select.addEventListener('change', () => { location.hash = select.value; });
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) if (entry.isIntersecting) {
+      const id = '#' + entry.target.id;
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === id));
+      select.value = id;
+    }
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+  const box = document.getElementById('lightbox'), big = box.querySelector('img');
+  document.querySelectorAll('figure img').forEach(img => img.addEventListener('click', () => { big.src = img.src; big.alt = img.alt; box.classList.add('open'); }));
+  box.addEventListener('click', () => box.classList.remove('open'));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') box.classList.remove('open'); });
+  const buttons = document.querySelectorAll('[data-theme-choice]');
+  function apply(choice) {
+    if (choice === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', choice);
+    buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)));
+  }
+  let saved = 'auto'; try { saved = localStorage.getItem('tuomin-manual-theme') || 'auto'; } catch {}
+  apply(saved);
+  buttons.forEach(b => b.addEventListener('click', () => { apply(b.dataset.themeChoice); try { localStorage.setItem('tuomin-manual-theme', b.dataset.themeChoice); } catch {} }));
+})();
+</script>
+</body>
+</html>

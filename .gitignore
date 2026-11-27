@@ -21,3 +21,21 @@ model_cache/
 *.mapping.json
 *.mapping.enc
 .DS_Store
+
+# Local desktop builds, caches, release identities and runtime data
+.venv-*/
+release/
+packaging/ner-model/
+packaging/native/
+packaging/delivery.json
+private_data/
+private_samples/
+real_samples/
+mappings/
+mapping_store/
+audit_logs/
+logs/
+outputs/
+out-snapshots/
+share-out/
+Thumbs.db

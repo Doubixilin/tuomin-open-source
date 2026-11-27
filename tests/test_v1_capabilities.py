@@ -580,3 +580,53 @@ def test_v1_redact_records_safe_call_ledger(tmp_path):
     assert call["blocked"] is False
     assert call["label_counts_json"]  # red line: counts only, never text
     assert "13900001111" not in json.dumps(call, ensure_ascii=False)
+
+
+def test_namespace_surface_identity_restores_the_spelling_the_user_wrote(tmp_path):
+    client = _client(tmp_path)
+    created = client.post(
+        "/api/v1/namespaces",
+        headers=_auth(NAMESPACE_TOKEN),
+        json={"app_id": "review_app", "identity_contract": "surface"},
+    ).json()
+    assert created["identity_contract"] == "surface"
+    namespace_id = created["namespace_id"]
+
+    redacted = _namespace_redact(client, namespace_id, "示建A与示例甲方确认").json()
+    # Two aliases of one canonical entity are distinct surface identities.
+    assert "<ORG_001>" in redacted["masked_text"]
+    assert "<ORG_002>" in redacted["masked_text"]
+    assert redacted["identity_contract"] == "surface"
+
+    again = _namespace_redact(client, namespace_id, "示建A再次确认").json()
+    assert "<ORG_001>" in again["masked_text"]  # same surface form -> same placeholder
+
+    refill = client.post(
+        "/api/v1/refill",
+        headers=_auth(REFILL_TOKEN),
+        json={
+            "app_id": "review_app",
+            "mapping_handle": again["mapping_handle"],
+            "contract": "trusted_display",
+            "text": "主体为 <ORG_001>，别名 <ORG_002>",
+        },
+    ).json()
+    assert refill["text"] == "主体为 示建A，别名 示例甲方"
+
+    status = client.get(
+        f"/api/v1/namespaces/{namespace_id}",
+        headers=_auth(NAMESPACE_TOKEN),
+        params={"app_id": "review_app"},
+    ).json()
+    assert status["identity_contract"] == "surface"
+
+
+def test_namespace_rejects_unknown_identity_contract(tmp_path):
+    client = _client(tmp_path)
+    response = client.post(
+        "/api/v1/namespaces",
+        headers=_auth(NAMESPACE_TOKEN),
+        json={"app_id": "review_app", "identity_contract": "exact"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_identity_contract"

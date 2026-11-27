@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -194,6 +195,20 @@ def macos_instance_url(path: Path | None = None) -> str | None:
     return normalize_base_url(text) or None
 
 
+def desktop_instance_url(environment: dict | None = None) -> str | None:
+    """Use the same data-directory precedence as the desktop launcher."""
+    environment = os.environ if environment is None else environment
+    configured = environment.get("TUOMIN_DATA_DIR")
+    if configured:
+        return macos_instance_url(Path(configured).expanduser() / "instance.url")
+    if sys.platform == "win32":
+        base = Path(environment.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+        return macos_instance_url(base / "Tuomin" / "instance.url")
+    if sys.platform == "darwin":
+        return macos_instance_url()
+    return macos_instance_url(Path.home() / ".local" / "share" / "tuomin" / "instance.url")
+
+
 def candidate_sources(
     *,
     base_url: str | None = None,
@@ -224,7 +239,8 @@ def candidate_sources(
             add(f"http://{host}:{int(str(env_port).strip())}", f"env:{GATEWAY_PORT_ENV}")
         except (TypeError, ValueError):
             pass
-    add(instance_url if instance_url is not None else macos_instance_url(), "macos-instance")
+    add(instance_url if instance_url is not None else desktop_instance_url(environment),
+        "macos-instance" if sys.platform == "darwin" else "desktop-instance")
     for candidate_port in scan_ports or ():
         add(f"http://{host}:{int(candidate_port)}", "scan")
     return candidates

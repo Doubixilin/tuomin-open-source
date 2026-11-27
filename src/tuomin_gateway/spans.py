@@ -11,6 +11,7 @@ non-overlapping — which the placeholder replacement step requires.
 """
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import replace
 
 from tuomin_gateway.schemas import DetectionSpan, hash_text
@@ -37,6 +38,32 @@ def _subtract(start: int, end: int, occupied: list[tuple[int, int]]) -> list[tup
     return free
 
 
+class _Occupied:
+    """Disjoint claimed intervals kept sorted by start.
+
+    ``resolve_overlaps`` used to re-sort every claimed interval for every span
+    (quadratic: tens of seconds on a large document, with no cancellation
+    point). Claimed pieces never overlap each other, so the ones intersecting a
+    query form one contiguous run that bisect finds directly."""
+
+    def __init__(self) -> None:
+        self.starts: list[int] = []
+        self.ends: list[int] = []
+
+    def overlapping(self, start: int, end: int) -> list[tuple[int, int]]:
+        index = bisect_left(self.starts, end)  # intervals starting before `end`
+        found: list[tuple[int, int]] = []
+        while index > 0 and self.ends[index - 1] > start:
+            index -= 1
+            found.append((self.starts[index], self.ends[index]))
+        return found
+
+    def add(self, start: int, end: int) -> None:
+        index = bisect_left(self.starts, start)
+        self.starts.insert(index, start)
+        self.ends.insert(index, end)
+
+
 def resolve_overlaps(
     ranked: list[DetectionSpan], text: str
 ) -> list[DetectionSpan]:
@@ -48,10 +75,14 @@ def resolve_overlaps(
     hash, and rewriting a ``canonical_value`` metadata to the clipped surface so
     a fragment can never be expanded back into the full canonical name).
     """
+    from tuomin_gateway.cancellation import check as check_cancelled
+
     selected: list[DetectionSpan] = []
-    occupied: list[tuple[int, int]] = []
-    for span in ranked:
-        for piece_start, piece_end in _subtract(span.start, span.end, occupied):
+    occupied = _Occupied()
+    for position, span in enumerate(ranked):
+        if position % 1024 == 0:
+            check_cancelled()
+        for piece_start, piece_end in _subtract(span.start, span.end, occupied.overlapping(span.start, span.end)):
             while piece_start < piece_end and text[piece_start].isspace():
                 piece_start += 1
             while piece_end > piece_start and text[piece_end - 1].isspace():
@@ -70,7 +101,7 @@ def resolve_overlaps(
                         metadata=_clipped_metadata(span.metadata, text[piece_start:piece_end]),
                     )
                 )
-            occupied.append((piece_start, piece_end))
+            occupied.add(piece_start, piece_end)
     return sorted(selected, key=lambda item: (item.start, item.end, item.label))
 
 

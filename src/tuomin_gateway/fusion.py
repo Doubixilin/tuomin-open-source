@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
+
 from tuomin_gateway.schemas import DetectionSpan
 from tuomin_gateway.spans import overlaps, resolve_overlaps
 
@@ -67,34 +69,63 @@ def _drop_contained_model_alternatives(
     ranked winner; a materially shorter cross-label alternative yields to its
     containing surface. Partial overlaps and every cross-source overlap still
     use the fail-closed clipping rule.
+
+    Only model spans take part, and a containing span must start within one
+    maximum model-span length of the contained one, so both passes look at a
+    small window of neighbours instead of every pair (the all-pairs version
+    took tens of seconds on large documents and could not be cancelled).
     """
-    cross_label_contained = {
-        id(shorter)
-        for shorter in ranked
-        for longer in ranked
-        if shorter is not longer
-        and shorter.source == longer.source == "model"
-        and shorter.label != longer.label
-        and longer.start <= shorter.start
-        and longer.end >= shorter.end
-        and longer.length() >= shorter.length() + 2
-    }
+    from tuomin_gateway.cancellation import check as check_cancelled
+
+    models = sorted((span for span in ranked if span.source == "model"), key=lambda item: (item.start, item.end))
+    model_starts = [span.start for span in models]
+    longest = max((span.length() for span in models), default=0)
+    cross_label_contained: set[int] = set()
+    for position, shorter in enumerate(models):
+        if position % 1024 == 0:
+            check_cancelled()
+        low = bisect_left(model_starts, shorter.start - longest)
+        high = bisect_right(model_starts, shorter.start)
+        for longer in models[low:high]:
+            if (
+                longer is not shorter
+                and shorter.label != longer.label
+                and longer.start <= shorter.start
+                and longer.end >= shorter.end
+                and longer.length() >= shorter.length() + 2
+            ):
+                cross_label_contained.add(id(shorter))
+                break
+
     kept: list[DetectionSpan] = []
-    for span in ranked:
+    kept_starts: list[int] = []
+    kept_models: list[DetectionSpan] = []
+    for position, span in enumerate(ranked):
+        if position % 1024 == 0:
+            check_cancelled()
         if id(span) in cross_label_contained:
             continue
-        redundant = any(
-            span.source == existing.source == "model"
-            and span.label == existing.label
-            and overlaps(span, existing)
-            and (
-                (span.start <= existing.start and span.end >= existing.end)
-                or (existing.start <= span.start and existing.end >= span.end)
+        redundant = False
+        if span.source == "model":
+            # A kept model span overlapping `span` starts before span.end and
+            # no earlier than span.start - longest.
+            low = bisect_left(kept_starts, span.start - longest)
+            high = bisect_left(kept_starts, span.end)
+            redundant = any(
+                span.label == existing.label
+                and overlaps(span, existing)
+                and (
+                    (span.start <= existing.start and span.end >= existing.end)
+                    or (existing.start <= span.start and existing.end >= span.end)
+                )
+                for existing in kept_models[low:high]
             )
-            for existing in kept
-        )
         if not redundant:
             kept.append(span)
+            if span.source == "model":
+                index = bisect_right(kept_starts, span.start)
+                kept_starts.insert(index, span.start)
+                kept_models.insert(index, span)
     return kept
 
 

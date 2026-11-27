@@ -138,12 +138,12 @@ def test_bank_account_span_stops_at_the_number():
 
 
 def test_landline_detected_with_hyphenated_area_code():
-    text = "联系方式：020-22905676，备用（0536）5600239。"
+    text = "联系方式：010-00000001，备用（0999）0000002。"
     spans = _spans_of(text, "CONTACT")
 
     captured = {text[span.start : span.end] for span in spans}
-    assert "020-22905676" in captured
-    assert "（0536）5600239" in captured
+    assert "010-00000001" in captured
+    assert "（0999）0000002" in captured
 
 
 def test_landline_with_extension_and_fullwidth_parens():
@@ -152,7 +152,7 @@ def test_landline_with_extension_and_fullwidth_parens():
 
 def test_landline_does_not_fire_on_bare_digit_runs_or_decimals():
     # 无分隔的 0 开头数字串（编号形态）与小数都不是固定电话。
-    assert "CONTACT" not in labels_for("批次号02022905676 系数0.22905676 已核对")
+    assert "CONTACT" not in labels_for("批次号01000000001 系数1.00000001 已核对")
 
 
 def test_bank_account_cue_window_covers_non_adjacent_number():

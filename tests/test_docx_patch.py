@@ -128,10 +128,9 @@ def test_probe_blockers_and_field_warning() -> None:
         probe_docx(encrypted)
     assert caught.value.code == "encrypted_package"
 
-    comments = f'<?xml version="1.0"?><w:comments xmlns:w="{W}"><w:comment w:id="0">{paragraph(run("批注"))}</w:comment></w:comments>'.encode()
-    with pytest.raises(DocxUnsupportedError) as caught:
-        probe_docx(package(paragraph(run("正文")), word__comments_xml=comments))
-    assert caught.value.code == "comments_present"
+    comments = f'<?xml version="1.0"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="张三">{paragraph(run("批注"))}</w:comment></w:comments>'.encode()
+    commented = probe_docx(package(paragraph(run("正文")), word__comments_xml=comments))
+    assert {"comments_patched", "authors_anonymized"} <= {warning["code"] for warning in commented}
 
     txbx = package('<w:p><w:r><w:drawing><w:txbxContent>' + paragraph(run("文本框")) + '</w:txbxContent></w:drawing></w:r></w:p>')
     warnings = probe_docx(txbx)
@@ -285,3 +284,37 @@ def test_ole_strip_redact_removes_package_traces() -> None:
     restored = refill_docx(data, {"<ORG_001>": "甲公司"})
     assert restored["status"] == "ok"
     assert texts(restored["data"])[0] == "甲公司"
+
+
+
+def test_tracked_changes_comments_and_footnotes_are_redacted_and_refilled() -> None:
+    body = (
+        paragraph(run("正文提到"), f'<w:ins w:id="1" w:author="李四" w:date="2026-10-24T00:00:00Z">{run("甲公司")}</w:ins>',
+                  f'<w:del w:id="2" w:author="李四"><w:r><w:delText>联系电话13800138000</w:delText></w:r></w:del>')
+    )
+    comments = f'<?xml version="1.0"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="张三" w:initials="ZS">{paragraph(run("请核对甲公司"))}</w:comment></w:comments>'.encode()
+    footnotes = f'<?xml version="1.0"?><w:footnotes xmlns:w="{W}"><w:footnote w:id="-1" w:type="separator">{paragraph(run(""))}</w:footnote><w:footnote w:id="1">{paragraph(run("注：甲公司"))}</w:footnote></w:footnotes>'.encode()
+    source = package(body, word__comments_xml=comments, word__footnotes_xml=footnotes)
+    warnings = {warning["code"] for warning in probe_docx(source)}
+    assert {"tracked_changes_patched", "comments_patched", "notes_patched", "authors_anonymized"} <= warnings
+    paragraphs = extract_paragraph_texts(source)
+    assert "正文提到甲公司联系电话13800138000" in [item.text for item in paragraphs]
+    assert {item.part for item in paragraphs} >= {"word/document.xml", "word/comments.xml", "word/footnotes.xml"}
+    replacements = []
+    for item in paragraphs:
+        for needle, placeholder in (("甲公司", "<ORG_001>"), ("13800138000", "<PHONE_001>")):
+            start = item.text.find(needle)
+            if start >= 0:
+                replacements.append({"part": item.part, "paragraph": item.index, "start": start, "end": start + len(needle), "placeholder": placeholder})
+    out = redact_docx(source, replacements)
+    for part in ("word/document.xml", "word/comments.xml", "word/footnotes.xml"):
+        raw = read_part(out["data"], part).decode()
+        assert "甲公司" not in raw and "13800138000" not in raw, part
+        assert "张三" not in raw and "李四" not in raw, part
+    assert 'w:author="匿名"'.encode() in read_part(out["data"], "word/comments.xml")
+    assert b"<w:delText>" in read_part(out["data"], "word/document.xml")
+    restored = refill_docx(out["data"], {"<ORG_001>": "甲公司", "<PHONE_001>": "13800138000"})
+    assert restored["status"] == "ok" and restored["restored_count"] == 4
+    document = read_part(restored["data"], "word/document.xml").decode()
+    assert "甲公司" in document and "联系电话13800138000" in document
+    assert "甲公司" in read_part(restored["data"], "word/footnotes.xml").decode()

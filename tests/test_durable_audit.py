@@ -11,12 +11,12 @@ Covers:
 from __future__ import annotations
 
 import json
-import stat
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests.permission_assertions import assert_owner_private
 from tuomin_gateway.audit import (
     AUDIT_STREAM_ADMIN,
     AUDIT_STREAM_GUARD,
@@ -53,8 +53,7 @@ def test_audit_log_appends_owner_only_jsonl_per_stream(tmp_path):
     assert len(refill_events) == 1
     assert all(isinstance(e["timestamp"], int) for e in guard_events + refill_events)
 
-    mode = stat.S_IMODE((tmp_path / "audit" / "guard-alerts.jsonl").stat().st_mode)
-    assert mode == 0o600
+    assert_owner_private(tmp_path / "audit" / "guard-alerts.jsonl", is_dir=False)
 
 
 def test_audit_log_rejects_invalid_stream_names(tmp_path):

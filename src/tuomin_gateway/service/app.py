@@ -10,6 +10,7 @@ import os
 import secrets
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -86,7 +87,18 @@ def create_app(
         raise ValueError("service mapping TTL must be greater than zero")
     session_ttl = session_ttl if session_ttl is not None else int(os.environ.get("TUOMIN_SESSION_TTL", "3600"))
 
-    app = FastAPI(title="Tuomin Desensitization Gateway", version=__version__)
+    @asynccontextmanager
+    async def lifespan(application):
+        try:
+            yield
+        finally:
+            # Windows cannot remove a demo's SQLite file while its connection
+            # is open. Close it before the launcher's temporary context exits.
+            jobs = getattr(application.state, "job_store", None)
+            if jobs is not None:
+                jobs.close()
+
+    app = FastAPI(title="Tuomin Desensitization Gateway", version=__version__, lifespan=lifespan)
     sessions: dict[str, dict] = {}
 
     # Admin auth: a token required on the state-changing admin surface. It lives in
@@ -289,7 +301,34 @@ def create_app(
         entry["ts"] = time.time()
         return entry["redactor"]
 
+    # --- cooperative cancellation for slow document requests ---
+    from tuomin_gateway import cancellation
+
+    @app.middleware("http")
+    async def _cancellation_scope(request: Request, call_next):
+        request_id = request.headers.get("x-tuomin-request-id")
+        if request.method != "POST" or not cancellation.valid_request_id(request_id):
+            return await call_next(request)
+        with cancellation.begin(request_id):
+            return await call_next(request)
+
+    @app.exception_handler(cancellation.Cancelled)
+    async def _cancelled(_request: Request, _exc: cancellation.Cancelled):
+        return JSONResponse(
+            {"status": "cancelled", "error": {"code": "cancelled", "message": "已按请求终止，本次未生成任何结果"}},
+            status_code=409,
+        )
+
+    @app.post("/api/v1/documents/cancel")
+    def cancel_document_request(payload: dict = Body(default={})) -> dict:
+        request_id = payload.get("request_id")
+        return {"status": "ok", "cancelled": cancellation.cancel(request_id)}
+
     # --- endpoints ---
+    @app.get("/api/v1/runtime-mode")
+    def runtime_mode() -> dict:
+        return {"demo": bool(getattr(app.state, "demo", False))}
+
     @app.get("/healthz")
     def healthz() -> dict:
         store.purge_expired()
@@ -569,7 +608,17 @@ def create_app(
 
     job_store = JobStore(store.directory)
     app.state.job_store = job_store
-    register_documents_api(app, store, vault, audit_log, job_store, registry)
+    # Workbench task mappings live in their own long-retention store so the
+    # desktop UI can refill by task (no passphrase, no recovery package) long
+    # after the 24-hour API grants have expired. 0 disables expiry.
+    from tuomin_gateway.vault import MappingVault
+
+    document_store = store.child(
+        "documents",
+        ttl_seconds=int(os.environ.get("TUOMIN_DOCUMENT_TTL", str(365 * 24 * 3600))),
+    )
+    document_vault = MappingVault(document_store)
+    register_documents_api(app, document_store, document_vault, audit_log, job_store, registry)
 
     # Pillar 1: unified reverse proxy (/v1/messages, /v1/chat/completions).
     from tuomin_gateway.service.proxy import register_proxy

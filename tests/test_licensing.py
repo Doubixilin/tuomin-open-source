@@ -236,7 +236,7 @@ def test_sign_script_roundtrip(tmp_path, request):
         local_app_data = Path(
             os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")
         )
-        system_temp = local_app_data / "Temp"
+        system_temp = Path(os.environ.get('TUOMIN_TEST_EXTERNAL_TEMP', str(local_app_data / "Temp")))
         system_temp.mkdir(parents=True, exist_ok=True)
         issuer_root = Path(
             tempfile.mkdtemp(prefix="tuomin-license-", dir=system_temp)
@@ -293,7 +293,7 @@ def test_ledger_records_and_lists(tmp_path, request):
         local_app_data = Path(
             os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")
         )
-        system_temp = local_app_data / "Temp"
+        system_temp = Path(os.environ.get('TUOMIN_TEST_EXTERNAL_TEMP', str(local_app_data / "Temp")))
         system_temp.mkdir(parents=True, exist_ok=True)
         issuer_root = Path(
             tempfile.mkdtemp(prefix="tuomin-ledger-", dir=system_temp)

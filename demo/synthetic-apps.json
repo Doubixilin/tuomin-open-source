@@ -1,0 +1,15 @@
+{
+  "_comment": "Synthetic demonstration only. These reversible rule-and-dictionary profiles do not represent production business policy.",
+  "apps": {
+    "demo_contract": {
+      "name": "合成合同演示",
+      "profile": {"base": "file_workbench", "use_ner": false},
+      "dictionary": "synthetic-dictionary.json"
+    },
+    "demo_general": {
+      "name": "合成通用词典",
+      "profile": {"base": "file_workbench", "use_ner": false},
+      "dictionary": "synthetic-dictionary.json"
+    }
+  }
+}

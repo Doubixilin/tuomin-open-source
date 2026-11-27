@@ -48,6 +48,13 @@ def main(argv: list[str] | None = None) -> int:
     dictionary_lint_parser = subparsers.add_parser("dictionary-lint")
     dictionary_lint_parser.add_argument("--dictionary", type=Path, required=True)
 
+    redact_file_parser = subparsers.add_parser("redact-file", help="脱敏文件（Word/Excel/PPT 保留排版，PDF/文本输出 .md）")
+    redact_file_parser.add_argument("files", nargs="+", type=Path)
+    redact_file_parser.add_argument("--app", default="workbench", help="使用哪个应用的词典与档位（默认 workbench）")
+    redact_file_parser.add_argument("--out-dir", type=Path, default=None, help="结果目录（默认写在原文件旁）")
+    redact_file_parser.add_argument("--gateway", default=None, help="正在运行的 Tuomin 地址；默认自动发现，找不到则在本进程内处理")
+    redact_file_parser.add_argument("--json", action="store_true", help="以 JSON 输出每个文件的结果")
+
     serve_parser = subparsers.add_parser("serve")
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=None)
@@ -55,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "redact":
         return _redact(args)
+    if args.command == "redact-file":
+        return _redact_file(args)
     if args.command == "refill":
         return _refill(args)
     if args.command == "eval":
@@ -223,6 +232,86 @@ def _print_error(error_type: str, message: str) -> int:
         )
     )
     return 2
+
+
+
+
+def _desktop_data_dir() -> Path:
+    from tuomin_gateway.agent_setup import default_data_dir
+
+    return default_data_dir()
+
+
+def _running_gateway(explicit: str | None) -> tuple[str | None, str | None]:
+    """(base_url, admin_token) of a running desktop instance, if any."""
+    data_dir = _desktop_data_dir()
+    url = explicit or os.environ.get("TUOMIN_GATEWAY_URL")
+    if not url:
+        try:
+            url = (data_dir / "instance.url").read_text(encoding="utf-8").strip().removesuffix("/ui/").removesuffix("/")
+        except OSError:
+            url = None
+    token = os.environ.get("TUOMIN_ADMIN_TOKEN")
+    if not token:
+        try:
+            token = (data_dir / "admin-token").read_text(encoding="utf-8").strip()
+        except OSError:
+            token = None
+    if url:
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(url.rstrip("/") + "/healthz", timeout=1) as response:
+                if response.status != 200:
+                    url = None
+        except OSError:
+            url = None
+    return url, token
+
+
+def _in_process_post():
+    """Serve the document API inside this process (servers, scripts, CI)."""
+    import secrets
+
+    from fastapi.testclient import TestClient
+
+    from tuomin_gateway.service.app import create_app
+
+    data_dir = _desktop_data_dir()
+    if not os.environ.get("TUOMIN_CONFIG") and (data_dir / "apps.json").exists():
+        os.environ["TUOMIN_CONFIG"] = str(data_dir / "apps.json")
+    os.environ.setdefault("TUOMIN_DATA_DIR", str(data_dir))
+    os.environ.setdefault("TUOMIN_MAPPING_DIR", str(data_dir / "mappings"))
+    token = secrets.token_urlsafe(32)
+    client = TestClient(create_app(admin_token=token), base_url="http://127.0.0.1")
+
+    def post(route: str, body: bytes) -> tuple[int, dict]:
+        response = client.post(route, content=body, headers={"x-tuomin-admin-token": token, "X-Requested-With": "tuomin-cli"})
+        try:
+            return response.status_code, response.json()
+        except ValueError:
+            return response.status_code, {}
+    return post
+
+
+def _redact_file(args: argparse.Namespace) -> int:
+    from tuomin_gateway.file_redact import http_post, redact_file
+
+    url, token = _running_gateway(args.gateway)
+    if url and token:
+        post, mode = http_post(url, token), f"connected:{url}"
+    else:
+        post, mode = _in_process_post(), "in-process"
+    results = [redact_file(path, post=post, app_id=args.app or None, out_dir=args.out_dir) for path in args.files]
+    if args.json:
+        print(json.dumps({"mode": mode, "results": results}, ensure_ascii=False, indent=2))
+    else:
+        for item in results:
+            if item["status"] == "ok":
+                print(f"✓ {item['source']} → {item['output']}（任务 {item['task_id']}）")
+            else:
+                print(f"✗ {item['source']}：{item['message']}")
+    return 0 if all(item["status"] == "ok" for item in results) else 1
 
 
 if __name__ == "__main__":
