@@ -129,6 +129,14 @@ def test_demo_service_never_touches_inaccessible_formal_directory(tmp_path, monk
                 assert "synthetic_extra" in registry.known_apps()
                 profile = registry.resolve_profile("demo_contract")
                 assert profile.use_ner is False
+                for app_id in ("demo_contract", "demo_general"):
+                    response = client.post(
+                        "/api/v1/documents/parse",
+                        params={"filename": "synthetic-contract.docx", "app_id": app_id},
+                        content=(demo.samples_dir / "synthetic-contract.docx").read_bytes(),
+                    )
+                    assert response.status_code == 200
+                    assert response.json()["egress"]["egress_allowed"] is True
                 store = store_module.MappingStore(os.environ["TUOMIN_MAPPING_DIR"])
                 output = store.save_payload("synthetic-demo", b"fictional fixture")
                 assert output.is_relative_to(demo.root)

@@ -16,11 +16,13 @@ import plistlib
 import runpy
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ROOT / ".venv-packaging/bin/python"
+VERSION = runpy.run_path(str(ROOT / "src/tuomin_gateway/__init__.py"))["__version__"]
 MACH_MAGICS = {bytes.fromhex(s) for s in ("feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca", "cafebabf", "bfbafeca")}
 
 
@@ -121,7 +123,7 @@ def build(args, work, release, app):
     # copying private configs, keys, runtime state or repository history.
     source_files = {p.relative_to(snapshot).as_posix(): sha256(p) for p in sorted(snapshot.rglob("*")) if p.is_file()}
     provenance = {
-        "product": "tuomin-workbench", "version": "0.1.0", "build": args.build_number,
+        "product": "tuomin-workbench", "version": VERSION, "build": args.build_number,
         "built_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": run("git", "rev-parse", "HEAD", cwd=ROOT, capture_output=True, text=True).stdout.strip(),
         "git_dirty": bool(run("git", "status", "--porcelain", cwd=ROOT, capture_output=True, text=True).stdout.strip()),
@@ -199,7 +201,7 @@ def notarize(args, work, release, app):
     run("ditto", app, image_root / "Tuomin.app")
     (image_root / "Applications").symlink_to("/Applications")
     copy_documents(image_root)
-    dmg = release / f"Tuomin-0.1.0-macos-arm64-{args.build_number}.dmg"
+    dmg = release / f"Tuomin-{VERSION}-macos-arm64-{args.build_number}.dmg"
     run("hdiutil", "create", "-volname", "Tuomin", "-srcfolder", image_root, "-format", "UDZO", dmg)
     run("codesign", "--timestamp", "--sign", args.identity, dmg)
     submit(args, dmg, work / "notary-dmg.json")
@@ -232,7 +234,7 @@ def package(args, work, release, app):
     run("ditto", app, content / "Tuomin.app")
     (content / "Applications").symlink_to("/Applications")
     copy_documents(content)
-    dmg = candidate / f"Tuomin-0.1.0-macos-arm64-{args.build_number}-signed.dmg"
+    dmg = candidate / f"Tuomin-{VERSION}-macos-arm64-{args.build_number}-signed.dmg"
     run("hdiutil", "create", "-volname", "Tuomin", "-srcfolder", content, "-format", "UDZO", dmg)
     run("codesign", "--timestamp", "--sign", args.identity, dmg)
     run("codesign", "--verify", "--strict", dmg)
@@ -279,12 +281,47 @@ def finalize(args, work, release, app):
     print(f"Final release: {release}")
 
 
+def public_dmg(acceptance_path: Path, build_number: str):
+    app = ROOT / "dist/lite/Tuomin Lite.app"
+    binary = app / "Contents/MacOS/tuomin-workbench"
+    plist = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    if not (app / "Contents/Resources/public-lite.txt").is_file():
+        raise SystemExit("Expected a public Lite build")
+    if plist.get("CFBundleShortVersionString") != VERSION or plist.get("CFBundleVersion") != build_number:
+        raise SystemExit("Unexpected application version or build number")
+    acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
+    if (acceptance.get("variant") != "lite" or not acceptance.get("full_matrix")
+            or acceptance.get("exit_code") != 0 or acceptance.get("binary_sha256") != sha256(binary)):
+        raise SystemExit("Run --public-lite frozen acceptance on this exact app first")
+    run("codesign", "--verify", "--deep", "--strict", app)
+    release = ROOT / "dist/releases"
+    release.mkdir(parents=True, exist_ok=True)
+    dmg = release / f"Tuomin-{VERSION}-macOS-arm64-Lite.dmg"
+    if dmg.exists():
+        raise SystemExit(f"Output already exists: {dmg}")
+    with tempfile.TemporaryDirectory(dir=release) as tmp:
+        tmp = Path(tmp)
+        content = tmp / "content"
+        content.mkdir()
+        run("ditto", app, content / app.name)
+        (content / "Applications").symlink_to("/Applications")
+        manual = runpy.run_path(str(ROOT / "scripts/build_manual.py"))["build"]
+        manual(content / "Tuomin使用手册.html")
+        shutil.copy2(ROOT / "LICENSE", content / "LICENSE")
+        run("hdiutil", "create", "-volname", "Tuomin Lite", "-srcfolder", content,
+            "-format", "UDZO", tmp / dmg.name)
+        run("hdiutil", "verify", tmp / dmg.name)
+        (tmp / dmg.name).rename(dmg)
+    print(f"{sha256(dmg)}  {dmg.name} ({dmg.stat().st_size} bytes)")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("build", "sign", "package", "notarize", "finalize"))
+    parser.add_argument("stage", choices=("build", "sign", "package", "notarize", "finalize", "public-dmg"))
     parser.add_argument("--build-number", required=True, help="Numeric CFBundleVersion, e.g. 20260915.1")
     parser.add_argument("--identity", default=os.environ.get("TUOMIN_SIGNING_IDENTITY", ""), help="Developer ID Application identity for sign, package and notarize")
     parser.add_argument("--profile", default=os.environ.get("TUOMIN_NOTARY_PROFILE"), help="Keychain profile for the notarize stage")
+    parser.add_argument("--acceptance", type=Path, help="Frozen acceptance JSON for public-dmg")
     args = parser.parse_args()
     if args.stage in {"sign", "package", "notarize"} and not args.identity:
         parser.error("Provide --identity or TUOMIN_SIGNING_IDENTITY for this stage")
@@ -294,6 +331,11 @@ def main():
         raise SystemExit("This release workflow requires macOS arm64")
     if not all(part.isdigit() for part in args.build_number.split(".")) or len(args.build_number.split(".")) > 3:
         raise SystemExit("Invalid build number")
+    if args.stage == "public-dmg":
+        if not args.acceptance:
+            parser.error("Provide --acceptance for the public-dmg stage")
+        public_dmg(args.acceptance, args.build_number)
+        return
     work = ROOT / "build" / ("macos-release-" + args.build_number)
     release = ROOT / "dist/releases" / ("tuomin-macos-arm64-" + args.build_number)
     globals()[args.stage](args, work, release, release / "Tuomin.app")

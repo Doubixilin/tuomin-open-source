@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import hashlib
 from importlib import metadata
 import json
+import os
 from pathlib import Path
 import platform
 import re
@@ -110,6 +111,9 @@ def build_release(bundle: Path, release_dir: Path, customer: str, *, lite: bool 
     version = project_version()
     variant_suffix = "-lite" if lite else ""
     base_name = f"Tuomin-windows-x64{variant_suffix}-{version}-{customer_slug(customer)}"
+    public_build = os.environ.get("TUOMIN_PUBLIC_BUILD") == "1"
+    if public_build:
+        base_name = f"Tuomin-{version}-Windows-x64-{'Lite' if lite else 'Runtime'}"
     release_dir.mkdir(parents=True, exist_ok=True)
     archive = release_dir / f"{base_name}.zip"
     manifest_path = release_dir / f"{base_name}.manifest.json"
@@ -143,7 +147,7 @@ def build_release(bundle: Path, release_dir: Path, customer: str, *, lite: bool 
         "python": platform.python_version(),
         "tools": {
             "pyinstaller": package_version("pyinstaller"),
-            "nuitka": package_version("nuitka"),
+            **({} if public_build else {"nuitka": package_version("nuitka")}),
         },
         "bundle": {
             "root": bundle.name,

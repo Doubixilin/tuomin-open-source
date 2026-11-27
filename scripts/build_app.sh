@@ -6,6 +6,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$REPO_ROOT/.venv-packaging"
+PUBLIC_BUILD="${TUOMIN_PUBLIC_BUILD:-0}"
+if [[ "$PUBLIC_BUILD" == "1" ]]; then
+    export TUOMIN_LITE=1
+fi
 BUILD_VARIANT="full"
 PACKAGE_NAME="tuomin-workbench"
 if [[ "${TUOMIN_LITE:-0}" == "1" ]]; then
@@ -27,27 +31,30 @@ export TUOMIN_MACOS_APP="${TUOMIN_MACOS_APP:-1}"
 export TUOMIN_BUILD_NUMBER="${TUOMIN_BUILD_NUMBER:-$(date +%Y%m%d.%H%M%S)}"
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-# Full bundles the NER runtime (torch/transformers); Lite excludes it in the spec.
 EXTRAS="serve,document,pdf,shell"
-if [[ "$BUILD_VARIANT" == "full" ]]; then
+BUILD_TOOLS=(pyinstaller nuitka)
+if [[ "$PUBLIC_BUILD" == "1" ]]; then
+    EXTRAS="serve,document,pdf-text,shell"
+    BUILD_TOOLS=(pyinstaller)
+elif [[ "$BUILD_VARIANT" == "full" ]]; then
     EXTRAS="$EXTRAS,ner"
 fi
 if [[ "${TUOMIN_BUILD_OFFLINE:-0}" == "1" ]]; then
-    # All pinned dependencies must already exist. No index or model access.
+    # All requested dependencies and the build backend must already be installed.
     "$VENV_DIR/bin/python" -m pip install --no-index --no-deps --no-build-isolation ".[$EXTRAS]"
 else
-    # The arm64 lock pins the verified versions (torch 2.13 / transformers 5.13 /
-    # fastapi 0.139 …) so a rebuilt venv reproduces earlier releases.
+    # Constrain the selected extras without installing unrelated optional runtimes.
+    PIP_ARGS=(install)
     if [[ -f "$REPO_ROOT/requirements-macos-arm64.lock" ]]; then
-        "$VENV_DIR/bin/python" -m pip install -r "$REPO_ROOT/requirements-macos-arm64.lock"
+        PIP_ARGS+=(-c "$REPO_ROOT/requirements-macos-arm64.lock")
     fi
-    "$VENV_DIR/bin/python" -m pip install ".[$EXTRAS]" pyinstaller nuitka
+    "$VENV_DIR/bin/python" -m pip "${PIP_ARGS[@]}" ".[$EXTRAS]" "${BUILD_TOOLS[@]}"
 fi
 
 # 交付标识：按 TUOMIN_CUSTOMER 生成烤入包内的 delivery.json
 # （WebUI 与 /api/v1/license/status 展示"交付单位"；不设置则本构建无标识）。
 DELIVERY_JSON="$REPO_ROOT/packaging/delivery.json"
-if [[ -n "${TUOMIN_CUSTOMER:-}" ]]; then
+if [[ "$PUBLIC_BUILD" != "1" && -n "${TUOMIN_CUSTOMER:-}" ]]; then
     "$VENV_DIR/bin/python" - "$DELIVERY_JSON" <<'EOF'
 import json, sys
 from datetime import datetime, timezone
@@ -68,7 +75,9 @@ fi
 
 # 分发加固：先把皇冠模块编译为原生扩展（packaging/native/），spec 据此
 # 剔除 PYZ 中对应 .pyc 并收编 .so。NER 依赖不随编译名单，编译仅覆盖纯逻辑模块。
-"$VENV_DIR/bin/python" scripts/build_native_modules.py
+if [[ "$PUBLIC_BUILD" != "1" ]]; then
+    "$VENV_DIR/bin/python" scripts/build_native_modules.py
+fi
 
 "$VENV_DIR/bin/pyinstaller" --clean --noconfirm --distpath "$DIST_ROOT" --workpath "$REPO_ROOT/build/$BUILD_VARIANT" packaging/tuomin_gateway.spec
 
@@ -96,7 +105,7 @@ manifest = {
     "product": "tuomin-workbench",
     "built_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "git_commit": commit,
-    "customer": os.environ.get("TUOMIN_CUSTOMER") or None,
+    "customer": None if os.environ.get("TUOMIN_PUBLIC_BUILD") == "1" else os.environ.get("TUOMIN_CUSTOMER") or None,
     "files": {binary.name: {"sha256": sha256(binary), "bytes": binary.stat().st_size}},
 }
 manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

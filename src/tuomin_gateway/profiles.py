@@ -237,6 +237,11 @@ PRESETS: dict[str, Profile] = {
     ),
 }
 
+# Explicit no-model desktop policy. All other file policies retain their NER checks.
+RULES_WORKBENCH = "file_workbench_rules"
+PRESETS[RULES_WORKBENCH] = replace(
+    PRESETS["file_workbench"], name=RULES_WORKBENCH, use_ner=False,
+)
 
 # --- declared sensitivity tiers ---------------------------------------------
 # An app declares "脱敏深度" as a sensitivity level; these map it onto the

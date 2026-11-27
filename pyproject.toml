@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tuomin-gateway"
-version = "0.1.0"
+version = "0.2.0"
 description = "脱敏网关：本地脱敏网关与桌面工作台，支持规则与词典、文档处理、占位符映射及严格回填"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,7 @@ shell = [
 serve = ["fastapi>=0.110,<1", "uvicorn>=0.27,<1", "httpx>=0.27,<1"]
 document = ["openpyxl>=3.1,<4", "xlrd>=2.0,<3"]
 # PyMuPDF has its own AGPL/commercial terms; see THIRD_PARTY_NOTICES.md.
+pdf-text = ["pdfminer.six==20260107"]
 pdf = ["pymupdf>=1.24,<2"]
 ner = ["transformers>=4.40,<6", "torch>=2.0,<3"]
 dev = ["python-docx>=1.1,<2", "pytest>=8,<10", "fastapi>=0.110,<1", "uvicorn>=0.27,<1", "httpx>=0.27,<1", "openpyxl>=3.1,<4", "xlrd>=2.0,<3"]

@@ -19,6 +19,7 @@ expected_native_modules = {
     ".".join(("tuomin_gateway", *Path(relative).parent.parts, Path(relative).stem))
     for relative in crown_modules
 }
+public_build = os.environ.get("TUOMIN_PUBLIC_BUILD") == "1"
 lite = os.environ.get("TUOMIN_LITE") == "1"
 package_name = ("Tuomin-Lite" if lite else "Tuomin") if sys.platform == "win32" else ("tuomin-workbench-lite" if lite else "tuomin-workbench")
 shell_datas, shell_binaries, shell_imports = [], [], []
@@ -38,11 +39,17 @@ for package in shell_packages:
 # The macOS hook does not collect pywebview's injected JS bridge resources.
 webview_resources = ["js/**/*.js"]
 if sys.platform == "win32":
-    webview_resources.append("lib/**/*")
+    if public_build and sys.maxsize > 2**32:
+        webview_resources.extend(["lib/Microsoft.Web.WebView2.Core.dll",
+                                  "lib/Microsoft.Web.WebView2.WinForms.dll",
+                                  "lib/WebBrowserInterop.x64.dll",
+                                  "lib/runtimes/win-x64/native/WebView2Loader.dll"])
+    else:
+        webview_resources.append("lib/**/*")
 shell_datas.extend(collect_data_files("webview", includes=webview_resources))
 model_datas = []
 model_files = ("config.json", "pytorch_model.bin", "tokenizer_config.json", "special_tokens_map.json", "vocab.txt")
-if not lite:
+if not lite and not public_build:
     model_dir = Path(os.environ.get("TUOMIN_BUNDLE_MODEL_DIR", str(
         Path.home() / ".cache/huggingface/hub/models--uer--roberta-base-finetuned-cluener2020-chinese/snapshots/cddd8fc233e373855a8c0a7f4b7eb83acb686a2b"
     )))
@@ -68,13 +75,13 @@ ner_imports = [] if lite else [
 native_dir = project_root / "packaging" / "native"
 native_binaries = []
 compiled_module_names = set()
-if not native_dir.is_dir():
+if not public_build and not native_dir.is_dir():
     raise SystemExit(f"native module directory is unavailable: {native_dir}")
 extension_suffixes = tuple(importlib.machinery.EXTENSION_SUFFIXES)
 for extension_path in sorted(
     path
     for path in native_dir.rglob("*")
-    if path.is_file() and path.name.endswith(extension_suffixes)
+    if not public_build and path.is_file() and path.name.endswith(extension_suffixes)
 ):
     rel = extension_path.relative_to(native_dir)
     module_name = ".".join(
@@ -85,7 +92,7 @@ for extension_path in sorted(
     compiled_module_names.add(module_name)
     dest_dir = Path("tuomin_gateway") / rel.parent
     native_binaries.append((str(extension_path), str(dest_dir)))
-missing_native = expected_native_modules - compiled_module_names
+missing_native = (set() if public_build else expected_native_modules) - compiled_module_names
 unexpected_native = compiled_module_names - expected_native_modules
 if missing_native or unexpected_native:
     raise SystemExit(
@@ -115,6 +122,8 @@ analysis = Analysis(
         (str(project_root / "src/tuomin_gateway/document/vendor/NOTICE.md"), "licenses/document"),
         *shell_datas,
         *model_datas,
+        *([(str(project_root / "packaging/public-lite.txt"), ".")] if public_build and lite else []),
+        *(collect_data_files("pdfminer", includes=["cmap/*"]) if public_build else []),
         *demo_datas,
         *icon_datas,
         # 随包的 Skill 模板（参考文件，供用户复制到各 agent 的 skills 目录）
@@ -135,16 +144,22 @@ analysis = Analysis(
         "uvicorn.lifespan.on",
         "openpyxl",
         "xlrd",
-        "pymupdf",
+        *(["pdfminer.high_level"] if public_build else ["pymupdf"]),
         *shell_imports,
         *ner_imports,
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tensorflow", "flax", "jax", "pytest", "_pytest", *(["torch", "transformers", "tokenizers", "safetensors", "huggingface_hub"] if lite else [])],
+    excludes=[*(["pymupdf", "fitz"] if public_build else []), "tensorflow", "flax", "jax", "pytest", "_pytest", *(["torch", "transformers", "tokenizers", "safetensors", "huggingface_hub"] if lite else [])],
+    module_collection_mode={"pystray": "py", "certifi": "py"} if public_build else None,
     noarchive=False,
 )
+
+if public_build:
+    collect_notices = runpy.run_path(str(project_root / "scripts/bundle_notices.py"))["bundle_notices"]
+    from PyInstaller.config import CONF
+    analysis.datas.extend(collect_notices(analysis, project_root, CONF["workpath"]))
 
 # 剔除已编译为原生扩展的模块，避免 PYZ 中的 .pyc 遮蔽 .so。
 if compiled_module_names:
@@ -204,7 +219,7 @@ bundle = COLLECT(
     upx=False,
     name=package_name,
 )
-if not lite:
+if not lite and not public_build:
     packaged_model = Path(DISTPATH) / package_name / "_internal" / "ner-model"
     if any(not (packaged_model / name).is_file() for name in model_files):
         raise SystemExit("Full model assets are missing their standard filenames")
@@ -227,7 +242,7 @@ if os.environ.get("TUOMIN_MACOS_APP") == "1":
         name="Tuomin Lite.app" if lite else "Tuomin.app",
         bundle_identifier="com.tuomin.workbench.lite" if lite else "com.tuomin.workbench",
         icon=str(project_root / "packaging/icon/Tuomin.icns"),
-        version="0.1.0",
+        version="0.2.0",
         info_plist={
             "CFBundleVersion": os.environ.get("TUOMIN_BUILD_NUMBER", "20261024.1"),
             "LSMinimumSystemVersion": minimum_system,

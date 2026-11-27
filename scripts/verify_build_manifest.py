@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.machinery
 import json
+import os
 from pathlib import Path
 import runpy
 import zipfile
@@ -118,14 +119,20 @@ def file_contains(path: Path, needle: bytes) -> bool:
     return False
 
 
-def verify_bundle_security(bundle: Path) -> None:
+def verify_bundle_security(bundle: Path, *, public_build: bool = False) -> None:
     if not (bundle / "Tuomin.exe").is_file():
         raise RuntimeError(f"Tuomin.exe is unavailable in bundle: {bundle}")
     private_key_hits: list[str] = []
     forbidden_paths: list[str] = []
     for path in (item for item in bundle.rglob("*") if item.is_file()):
         relative = path.relative_to(bundle)
-        if FORBIDDEN_PARTS & {part.casefold() for part in relative.parts}:
+        parts = {part.casefold() for part in relative.parts}
+        restricted_public = public_build and (
+            parts & {"ner-model", "delivery.json", "pymupdf", "fitz"}
+            or path.suffix.lower() == ".safetensors"
+            or path.name.lower() == "pytorch_model.bin"
+        )
+        if FORBIDDEN_PARTS & parts or restricted_public:
             forbidden_paths.append(relative.as_posix())
         if path.stat().st_size <= 8 * 1024 * 1024 and file_contains(
             path, PRIVATE_KEY_MARKER
@@ -135,7 +142,8 @@ def verify_bundle_security(bundle: Path) -> None:
         raise RuntimeError(f"private runtime paths leaked into bundle: {forbidden_paths}")
     if private_key_hits:
         raise RuntimeError(f"private key material detected in bundle: {private_key_hits}")
-    verify_native_modules(bundle)
+    if not public_build:
+        verify_native_modules(bundle)
 
 
 def verify_manifest(bundle: Path, manifest_path: Path) -> dict:
@@ -201,9 +209,12 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--checksum", type=Path)
+    parser.add_argument("--public-build", action="store_true",
+                        default=os.environ.get("TUOMIN_PUBLIC_BUILD") == "1",
+                        help="verify the public source distribution without proprietary assets or native-module requirements")
     args = parser.parse_args()
     bundle = args.bundle.resolve()
-    verify_bundle_security(bundle)
+    verify_bundle_security(bundle, public_build=args.public_build)
     if args.manifest:
         manifest = verify_manifest(bundle, args.manifest.resolve())
         if not args.archive or not args.checksum:

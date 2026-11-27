@@ -45,7 +45,7 @@ from tuomin_gateway.mapping import PlaceholderFactory
 from tuomin_gateway.mapproc import PackageError, export_manifest, export_package, import_package
 from tuomin_gateway.placeholders import PLACEHOLDER_RE, reserved_placeholder_conflict
 from tuomin_gateway.policy import POLICY_SCHEMA_VERSION
-from tuomin_gateway.profiles import get_profile, is_fully_reversible
+from tuomin_gateway.profiles import RULES_WORKBENCH, get_profile, is_fully_reversible
 from tuomin_gateway.redactor import normalize_detections, redact_text
 from tuomin_gateway.schemas import MappingEntry
 from tuomin_gateway.service.registry import AppRegistry, RegistryConfigurationError
@@ -61,6 +61,11 @@ _AUDIT_STREAM_WORKBENCH = "workbench"
 _EGRESS_DISCLAIMER = (
     "egress_allowed 仅表示当前配置与扫描通过，不构成零漏检承诺"
 )
+
+
+def _file_profile(registry: AppRegistry, bound_app: str | None):
+    entry = (registry.get_app(bound_app) or {}) if bound_app else {}
+    return get_profile(RULES_WORKBENCH if entry.get("profile") == RULES_WORKBENCH else _PROFILE)
 
 
 def _max_bytes() -> int:
@@ -285,14 +290,6 @@ def register_documents_api(
                 409,
             )
 
-        profile = get_profile(_PROFILE)
-        if not is_fully_reversible(profile):
-            return _error(
-                "profile_not_reversible",
-                "file workbench profile is not fully reversible",
-                500,
-            )
-
         # Egress gate (plan 阶段 8 §9.1): the workbench may bind a registered
         # app to use its production dictionary; unbound parses stay preview-only
         # (egress blocked with app_not_bound). Unknown apps fail closed — never
@@ -314,6 +311,14 @@ def register_documents_api(
             entries = dict_state.entries or []
             dictionary_version = dict_state.version
         effective_app = bound_app or _APP_ID
+
+        profile = _file_profile(registry, bound_app)
+        if not is_fully_reversible(profile):
+            return _error(
+                "profile_not_reversible",
+                "file workbench profile is not fully reversible",
+                500,
+            )
 
         detectors = build_detectors(entries=entries)
         table_cells = markdown_table_cells(text)
@@ -349,7 +354,7 @@ def register_documents_api(
                 file_name=file_name,
                 file_sha256=extracted.file_sha256,
                 file_format=extracted.file_format,
-                profile=_PROFILE,
+                profile=profile.name,
                 versions=versions,
                 mapping_ref=mapping_ref,
                 app_id=effective_app,
@@ -384,7 +389,7 @@ def register_documents_api(
                 result.mapping,
                 job_id=task_id,
                 app_id=_APP_ID,
-                profile=_PROFILE,
+                profile=profile.name,
                 versions=versions,
             ),
             "warnings": _safe_warnings(extracted.warnings),
@@ -1103,7 +1108,7 @@ def register_documents_api(
             return bind_error
         effective_app = bound_app or _APP_ID
 
-        profile = get_profile(_PROFILE)
+        profile = _file_profile(registry, bound_app)
         if not is_fully_reversible(profile):
             return _error(
                 "profile_not_reversible",
@@ -1343,7 +1348,7 @@ def register_documents_api(
                 file_name=file_name,
                 file_sha256=source_digest,
                 file_format=file_format,
-                profile=_PROFILE,
+                profile=profile.name,
                 versions=versions,
                 mapping_ref=mapping_ref,
                 app_id=effective_app,

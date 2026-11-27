@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 from urllib.parse import quote
 from tuomin_gateway.capability_tokens import generate_capability_token
+from tuomin_gateway.profiles import RULES_WORKBENCH
+from .defaults import is_public_lite_build
 from .storage import read_private, write_private
 
 CAPABILITIES = ('detect', 'redact', 'namespace', 'trusted_refill')
@@ -39,10 +41,22 @@ class ClipboardRegistration:
             'capability_tokens': {k: 'sha256:' + hashlib.sha256(v.encode()).hexdigest() for k, v in self.tokens.items()},
             'refill_contracts': ['trusted_display'], 'mapping_scopes': ['namespace'],
         }
+        original = {}
         if source:
             original = self._admin('GET', '/admin/apps/' + quote(source, safe='')).get('entry', {})
             if not original.get('dictionary'):
                 raise ValueError('selected dictionary unavailable')
             entry['dictionary'] = original['dictionary']
+        if is_public_lite_build():
+            # Keep an existing stricter clipboard policy when refreshing credentials.
+            apps = self._admin('GET', '/admin/apps').get('apps', [])
+            existing = next((app for app in apps if app.get('app_id') == 'clipboard'), {})
+            policy_fields = ('profile', 'scenario', 'sensitivity')
+            policy = original
+            if existing.get('profile') != RULES_WORKBENCH and any(existing.get(k) for k in policy_fields):
+                policy = existing
+            declared = {k: policy[k] for k in policy_fields if policy.get(k)}
+            entry.pop('profile')
+            entry.update(declared or {'profile': 'strict' if source else RULES_WORKBENCH})
         self._admin('PUT', '/admin/apps/clipboard', entry)
         self._admin('POST', '/dict/reload', {})

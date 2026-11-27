@@ -12,6 +12,22 @@ from tuomin_gateway.document.pdf import extract_pdf
 from tuomin_gateway.document.vendor.document_ir import source_uid
 
 
+@pytest.fixture(params=["pymupdf-native", "pdfminer-native"])
+def backend(request, monkeypatch):
+    if request.param == "pdfminer-native":
+        import builtins
+        pytest.importorskip("pdfminer.high_level")
+        original = builtins.__import__
+
+        def without_pymupdf(name, *args, **kwargs):
+            if name == "pymupdf":
+                raise ImportError("test the standalone text parser")
+            return original(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", without_pymupdf)
+    return request.param
+
+
 def _uid(path) -> str:
     return source_uid(hashlib.sha256(path.read_bytes()).hexdigest())
 
@@ -20,7 +36,7 @@ def _warning_codes(warnings) -> set[str]:
     return {warning["code"] for warning in warnings}
 
 
-def test_single_column_cjk_lines_are_extracted_in_order(tmp_path) -> None:
+def test_single_column_cjk_lines_are_extracted_in_order(tmp_path, backend) -> None:
     path = tmp_path / "single-column.pdf"
     document = pymupdf.open()
     page = document.new_page()
@@ -35,7 +51,7 @@ def test_single_column_cjk_lines_are_extracted_in_order(tmp_path) -> None:
     assert [block.order for block in blocks] == [1, 2]
     assert blocks[0].block_id == "page-001-line-0001"
     assert blocks[0].legacy_locators == ["job-cjk#page001"]
-    assert blocks[0].extraction_method == "pymupdf-native"
+    assert blocks[0].extraction_method == backend
     assert stats == {
         "pages": 1,
         "lines": 2,
@@ -46,7 +62,7 @@ def test_single_column_cjk_lines_are_extracted_in_order(tmp_path) -> None:
     assert "PDF_REQUIRES_OCR" not in _warning_codes(warnings)
 
 
-def test_bilingual_two_column_page_is_reordered(tmp_path) -> None:
+def test_bilingual_two_column_page_is_reordered(tmp_path, backend) -> None:
     path = tmp_path / "two-column.pdf"
     left_lines = ["这是左栏第一段中文内容", "这是左栏第二段中文内容"]
     right_lines = [
@@ -70,7 +86,7 @@ def test_bilingual_two_column_page_is_reordered(tmp_path) -> None:
     assert stats["two_column_pages"] == 1
 
 
-def test_image_only_page_requires_ocr(tmp_path) -> None:
+def test_image_only_page_requires_ocr(tmp_path, backend) -> None:
     path = tmp_path / "scan.pdf"
     document = pymupdf.open()
     page = document.new_page()
@@ -93,7 +109,7 @@ def test_image_only_page_requires_ocr(tmp_path) -> None:
     assert blocking["message"] == "扫描件 PDF 需要 OCR，当前不支持"
 
 
-def test_control_character_heavy_page_is_flagged_as_garbled(tmp_path) -> None:
+def test_control_character_heavy_page_is_flagged_as_garbled(tmp_path, backend) -> None:
     path = tmp_path / "garbled.pdf"
     document = pymupdf.open()
     page = document.new_page()
@@ -107,7 +123,7 @@ def test_control_character_heavy_page_is_flagged_as_garbled(tmp_path) -> None:
     assert "PDF_GARBLED_TEXT" in _warning_codes(warnings)
 
 
-def test_extract_document_routes_pdf_end_to_end(tmp_path) -> None:
+def test_extract_document_routes_pdf_end_to_end(tmp_path, backend) -> None:
     path = tmp_path / "routed.pdf"
     document = pymupdf.open()
     page = document.new_page()

@@ -587,6 +587,9 @@ def _main() -> int:
         # The app AI tools connect through (MCP); tokens stay in data_dir.
         ensure_agent_app(config_path, data_dir)
     app = create_app()
+    from tuomin_gateway.shell.defaults import is_public_lite_build
+
+    app.state.public_lite = is_public_lite_build()
     app.state.demo = args.demo
     if args.demo:
         from fastapi.staticfiles import StaticFiles

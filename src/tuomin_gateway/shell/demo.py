@@ -10,6 +10,8 @@ import shutil
 import sys
 import tempfile
 from tuomin_gateway.platform_security import restrict_permissions
+from tuomin_gateway.profiles import RULES_WORKBENCH
+from .defaults import is_public_lite_build
 
 
 SAMPLE_NAMES = ("synthetic-contract.docx", "synthetic-register.xlsx")
@@ -58,6 +60,8 @@ def demo_environment():
             registry = json.loads((assets / "synthetic-apps.json").read_text(encoding="utf-8"))
             for entry in registry["apps"].values():
                 entry["dictionary"] = str(dictionary)
+                if is_public_lite_build() and entry.get("profile") == {"base": "file_workbench", "use_ner": False}:
+                    entry["profile"] = RULES_WORKBENCH
             config = root / "synthetic-apps.json"
             config.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             restrict_permissions(config, is_dir=False)

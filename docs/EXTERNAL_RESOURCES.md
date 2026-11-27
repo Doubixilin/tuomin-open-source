@@ -53,11 +53,12 @@ python -m pip install '.[ner]'
 | HTTPX | https://www.python-httpx.org/ | HTTP 客户端，`.[serve]` |
 | openpyxl | https://openpyxl.readthedocs.io/ | XLSX/XLSM，`.[document]` |
 | xlrd | https://xlrd.readthedocs.io/ | XLS，`.[document]` |
+| pdfminer.six | https://github.com/pdfminer/pdfminer.six | 公开 Lite 的文字型 PDF 后端，源码可选 `.[pdf-text]` |
 | PyMuPDF | https://pymupdf.readthedocs.io/ | PDF 原生文字，单独 `.[pdf]`；先阅读其许可 |
 | Transformers | https://huggingface.co/docs/transformers/ | 本地 NER 适配，`.[ner]`；不包含模型权重 |
 | PyTorch | https://pytorch.org/ | 本地 NER 运行时，`.[ner]`；CPU/GPU 配置由使用者准备 |
 
-仓库提供 Python 依赖声明，而不是这些软件的副本。实际安装版本应在复现报告中记录。许可说明见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
+公开桌面构建随附所用软件版本和许可文本。许可说明见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
 
 ## 数据与外部应用
 

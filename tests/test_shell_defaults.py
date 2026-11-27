@@ -55,3 +55,53 @@ def test_unreadable_or_foreign_registry_is_left_alone(tmp_path):
     assert ensure_default_workbench_app(config, tmp_path) is False
     assert config.read_text(encoding="utf-8") == "not json"
     assert not (tmp_path / "dictionaries").exists()
+
+
+def test_public_lite_defaults_require_bundle_marker_and_preserve_strict(tmp_path, monkeypatch):
+    import sys
+    from tuomin_gateway.profiles import RULES_WORKBENCH, get_profile
+    from tuomin_gateway.shell.defaults import is_public_lite_build
+
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert not is_public_lite_build()
+    (tmp_path / "public-lite.txt").touch()
+    assert is_public_lite_build()
+    registry = tmp_path / "apps.json"
+    ensure_default_workbench_app(registry, tmp_path)
+    payload = json.loads(registry.read_text())
+    assert payload["apps"][DEFAULT_APP_ID]["profile"] == RULES_WORKBENCH
+    assert not get_profile(RULES_WORKBENCH).use_ner
+    assert get_profile("file_workbench").use_ner
+    payload["apps"][DEFAULT_APP_ID]["profile"] = "strict"
+    registry.write_text(json.dumps(payload))
+    assert not ensure_default_workbench_app(registry, tmp_path)
+    assert json.loads(registry.read_text()) == payload
+    monkeypatch.setattr(sys, "frozen", False)
+    assert not is_public_lite_build()
+
+
+def test_public_lite_clipboard_follows_workbench_but_retains_explicit_policy(tmp_path, monkeypatch):
+    from tuomin_gateway.profiles import RULES_WORKBENCH
+    from tuomin_gateway.shell import registration
+
+    class Admin:
+        entries = {"workbench": {"profile": RULES_WORKBENCH, "dictionary": "dictionaries/workbench.json"}}
+
+        def request(self, method, path, payload, **_):
+            if path == "/admin/apps":
+                return 200, {"apps": [{"app_id": key, **entry} for key, entry in self.entries.items()]}
+            app_id = path.rsplit("/", 1)[-1]
+            if method == "PUT":
+                self.entries[app_id] = payload
+            return 200, {"entry": self.entries.get(app_id, {})}
+
+    monkeypatch.setattr(registration, "is_public_lite_build", lambda: True)
+    client = Admin()
+    clipboard = registration.ClipboardRegistration(client, "test-admin", tmp_path)
+    clipboard.configure("workbench")
+    assert client.entries["clipboard"]["profile"] == RULES_WORKBENCH
+    assert client.entries["clipboard"]["dictionary"] == client.entries["workbench"]["dictionary"]
+    client.entries["clipboard"]["profile"] = "strict"
+    clipboard.configure("workbench")
+    assert client.entries["clipboard"]["profile"] == "strict"

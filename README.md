@@ -1,17 +1,50 @@
-# Tuomin 脱敏网关
+# Tuomin 脱敏网关与桌面工作台
 
-Tuomin 在本机识别敏感内容，生成带占位符的文本，并在可信环境中回填原文。仓库包含网关、macOS 和 Windows 桌面工作台、Office 文件处理、客户端接入、构建脚本及回归测试。此次发布提供源码；桌面安装包另行发布。
+Tuomin 帮你在本机把文档里的联系人、组织名称、合同号等敏感值替换成占位符。将经过核对的内容交给 AI，拿到回答后再用同一份本地映射恢复原值。你可以从 macOS 菜单栏或 Windows 托盘处理剪贴板，也可以批量处理 Office 文件，或把客户端接到本地网关。
+
+**[macOS Apple Silicon · DMG](https://github.com/Doubixilin/tuomin-open-source/releases/download/v0.2.0/Tuomin-0.2.0-macOS-arm64-Lite.dmg) · [Windows x64 · ZIP](https://github.com/Doubixilin/tuomin-open-source/releases/download/v0.2.0/Tuomin-0.2.0-Windows-x64-Lite.zip) · [Office 和剪贴板演示包](https://github.com/Doubixilin/tuomin-open-source/releases/download/v0.2.0/Tuomin-0.2.0-Demo.zip)**
+
+macOS 13 起可用，打开 DMG 后将 Tuomin Lite 拖入「应用程序」。Mac 包采用本机临时签名，未经 Apple 公证。Windows 完整解压后运行 `Tuomin.exe`，窗口使用系统 WebView2。两个 Lite 构建都使用规则和本机词典，未登记的人名、机构请人工核对。[版本说明与 SHA-256](https://github.com/Doubixilin/tuomin-open-source/releases/tag/v0.2.0) · [按图上手](docs/DESKTOP_GUIDE.md) · [在线查看 Office 对照](demo/office-showcase/README.md)
+
+![使用合成文本查看原文标记、占位符结果和检测统计](docs/manual/img/walkthrough-text-diff.webp)
+
+### 选一个任务开始
+
+| 手头的任务 | 从哪里开始 | 怎么核对 |
+| --- | --- | --- |
+| 复制一段内容给 AI | 复制原文，手动触发「脱敏剪贴板」，再粘贴给 AI | 在 Tuomin 查看占位符，把 AI 回答复制回来后触发「回填剪贴板」。[剪贴板操作](docs/DESKTOP_GUIDE.md#剪贴板) |
+| 交付一份 Word、Excel 或 PowerPoint | 打开「文件脱敏」，选择词典和文件，按需导出原格式副本 | 下载同一份合成材料的原件、脱敏件、回填件，检查表格、排版和占位符。[Office 演示](demo/office-showcase/README.md) |
+| 想知道某个名字会不会被识别 | 打开「文本脱敏」，粘贴文字、选档位、执行预览 | 对照原文和占位符，检查漏掉的敏感值，也检查是否意外删除了条款。[操作图解](docs/DESKTOP_GUIDE.md#文本预览) |
+| 想让已有 AI 工具接入 | 打开「工具接入」，选择 MCP 或支持自定义地址的兼容客户端 | 先自检，再到客户端确认实际生效的工具或网关地址。[网关说明](docs/GATEWAY.md) |
+
+**剪贴板怎么用。** 复制原文后按 macOS `⌥⌘D` 或 Windows `Ctrl+Alt+D`，Tuomin 才会读取并将成功的脱敏结果写回剪贴板。手动粘贴给 AI。复制 AI 回答后按 `⌥⌘R` 或 `Ctrl+Alt+R`，再把恢复结果粘回本地文档。普通动作遇到阻断、未知占位符或剪贴板已变化时会保留当时的内容。要自动粘贴，需另外启用「选中脱敏并替换」或「选中回填并替换」。[剪贴板操作与实拍](docs/DESKTOP_GUIDE.md#剪贴板)
+
+**工作中的界面**
+
+| 处理 Excel 台账 | 用任务映射回填一段回答 |
+| --- | --- |
+| [![合成 Excel 解析后的预览和导出控制](docs/manual/img/walkthrough-spreadsheet.webp)](docs/manual/img/walkthrough-spreadsheet.webp) | [![从本地映射恢复组织和联系人](docs/manual/img/walkthrough-answer.webp)](docs/manual/img/walkthrough-answer.webp) |
+
+### Office 原格式脱敏效果
+
+以下是实际生成的合成脱敏件。点击图打开大图，检查版式和占位符；对照包同时提供可编辑的原件和回填件。
+
+| Word 条款 | Excel 台账 | PowerPoint 项目简报 |
+| --- | --- | --- |
+| [![脱敏 Word 文件的段落与表格](demo/office-showcase/images/service-agreement-redacted.webp)](demo/office-showcase/images/service-agreement-redacted.webp) | [![脱敏 Excel 文件的列和单元格](demo/office-showcase/images/delivery-register-redacted.webp)](demo/office-showcase/images/delivery-register-redacted.webp) | [![脱敏 PowerPoint 文件的投影片](demo/office-showcase/images/project-brief-redacted.webp)](demo/office-showcase/images/project-brief-redacted.webp) |
+
+[下载原件、脱敏件、回填件与流程演示 PPT](demo/office-showcase/README.md)
 
 ## 从源码运行桌面工作台
 
-从仓库根目录创建并激活 Python 虚拟环境。桌面回归使用 Python 3.12.10，Node 测试使用 22.23.1。启动合成演示的命令如下。
+从仓库根目录创建并激活 Python 虚拟环境。桌面回归使用 Python 3.12.10，Node 测试使用 22.23.1。安装依赖后，以下命令启动合成演示。
 
 ```bash
 python -m pip install ".[serve,shell,document]"
 python packaging/launcher.py --demo
 ```
 
-演示会在临时目录创建合成词典、应用配置与 Office 文件。正常运行使用 `python packaging/launcher.py`。需要原生窗口时，macOS 使用系统 WebKit，Windows 使用 WebView2。要处理 PDF，请另行安装 `.[pdf]`；要启用中文 NER，请按[外部资源说明](docs/EXTERNAL_RESOURCES.md)准备本地权重。
+演示会在临时目录创建合成词典、应用配置与 Office 文件。正常运行使用 `python packaging/launcher.py`。需要原生窗口时，macOS 使用系统 WebKit，Windows 使用 WebView2。从源码处理 PDF 原生文本可安装 `.[pdf-text]`（pdfminer.six）。公开 Lite 桌面包包含这条文本解析路径。Lite 使用规则与选定词典，未登记的姓名或公司可能留下；启用本地 NER 的源码部署需另备权重。[外部资源说明](docs/EXTERNAL_RESOURCES.md)
 
 ## 作为本地 AI 网关使用
 
@@ -55,6 +88,7 @@ flowchart TB
 
 | 想了解什么 | 图文入口 |
 | --- | --- |
+| 日常怎样识别、脱敏、回填和导出 | [桌面工作台图文指南](docs/DESKTOP_GUIDE.md) |
 | 为什么采用本地脱敏与可信回填、有哪些功能 | [设计思路、数据边界和功能总览](docs/DESIGN.md) |
 | 各层怎样协作，规则、词典、NER 如何融合 | [技术架构、检测流水线和 NER 实现](docs/ARCHITECTURE.md) |
 | 文本、文件、回答和长期上下文分别怎样处理 | [工作流程、回填决策和映射生命周期](docs/WORKFLOWS.md) |
@@ -88,8 +122,8 @@ python examples/minimal_demo.py
 | 规则检测、词典匹配、重叠合并、脱敏与严格回填 | 最小示例可直接研究，无模型 |
 | 会话稳定占位符、命名空间、审计、映射保护、权限控制 | 提供实现与合成测试；部署前按场景配置 |
 | 本地 HTTP API 与 Web 控制台 | 安装 `.[serve]` 并准备应用配置 |
-| TXT / DOCX / 表格处理 | 提供实现；表格依赖 `.[document]`；PPTX 根据受支持的文本部件处理，旧格式依平台转换条件而定 |
-| PDF 原生文字提取 | 单独安装 `.[pdf]`，先阅读 PyMuPDF 许可；不提供 OCR |
+| TXT、Word、Excel、PowerPoint | DOCX、XLSX、PPTX 支持生成原格式副本与回填件。源码处理表格需安装 `.[document]`。旧格式转换取决于本机工具。 |
+| PDF 原生文字提取 | Lite 使用 pdfminer.six，处理已有文字层。扫描页和图片需要另行核查。 |
 | 本地中文 NER | 仅提供接入代码；模型权重不随仓库提供，需自行核实许可和准备 |
 | MCP、模型代理、外部应用适配 | 提供代码供研究，须自行配置服务地址、Token、上游和应用策略；最小示例不会启用 |
 | macOS / Windows 桌面工作台 | 含托盘或菜单栏、剪贴板、选区、热键、演示及两端构建脚本 |
@@ -136,7 +170,7 @@ python -m pytest -q
 npm test
 ```
 
-测试使用临时目录和合成数据，不要求下载模型。PDF 测试在未安装 PyMuPDF 时跳过；如接受其许可并需要验证 PDF，可以安装 `.[pdf]` 后重跑。平台专属测试在不适用的平台跳过。双平台验证范围见 [验证记录](docs/VALIDATION.md)。
+测试使用临时目录和合成数据，不要求下载模型。安装 `.[pdf-text]` 可验证公开构建的 PDF 读取路径，安装 `.[pdf]` 可额外验证 PyMuPDF 后端。平台专属测试在不适用的平台跳过。双平台验证范围见 [验证记录](docs/VALIDATION.md)。
 
 ## 许可证
 

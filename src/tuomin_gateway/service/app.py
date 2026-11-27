@@ -327,7 +327,11 @@ def create_app(
     # --- endpoints ---
     @app.get("/api/v1/runtime-mode")
     def runtime_mode() -> dict:
-        return {"demo": bool(getattr(app.state, "demo", False))}
+        response = {"demo": bool(getattr(app.state, "demo", False))}
+        if getattr(app.state, "public_lite", False):
+            from tuomin_gateway.profiles import RULES_WORKBENCH
+            response.update(public_lite=True, rules_workbench=(registry.get_app("workbench") or {}).get("profile") == RULES_WORKBENCH)
+        return response
 
     @app.get("/healthz")
     def healthz() -> dict:

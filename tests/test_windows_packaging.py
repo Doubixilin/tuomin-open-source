@@ -166,6 +166,15 @@ def test_build_verifier_rejects_private_key_material(tmp_path: Path) -> None:
         VERIFY.verify_bundle_security(bundle)
 
 
+def test_public_verifier_checks_runtime_contents_without_native_modules(tmp_path: Path) -> None:
+    (tmp_path / "Tuomin.exe").write_bytes(b"synthetic executable")
+    VERIFY.verify_bundle_security(tmp_path, public_build=True)
+    forbidden = tmp_path / "pytorch_model.bin"
+    forbidden.write_bytes(b"synthetic weights")
+    with pytest.raises(RuntimeError, match="private runtime paths"):
+        VERIFY.verify_bundle_security(tmp_path, public_build=True)
+
+
 def test_windows_build_script_pins_toolchain_and_safe_outputs() -> None:
     script = (REPO_ROOT / "scripts" / "build_app.ps1").read_text(encoding="utf-8")
     assert "Python 3.12.10" in script

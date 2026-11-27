@@ -24,6 +24,8 @@ methods return JSON-RPC -32601; tool errors are reported as
 """
 from __future__ import annotations
 
+from tuomin_gateway import __version__
+
 import json
 import os
 import sys
@@ -274,7 +276,7 @@ def dispatch(gateway: AgentGateway, message: dict) -> dict | None:
         return respond({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "tuomin-mcp", "version": "0.1.0"},
+            "serverInfo": {"name": "tuomin-mcp", "version": __version__},
         })
     if method == "notifications/initialized" or method == "notifications/cancelled":
         return None

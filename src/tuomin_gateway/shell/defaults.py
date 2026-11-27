@@ -9,12 +9,19 @@ calls :func:`ensure_default_workbench_app` on every desktop start (native or
 from __future__ import annotations
 
 import json
+import sys
+from tuomin_gateway.profiles import RULES_WORKBENCH
 from pathlib import Path
 from .storage import write_private
 
 DEFAULT_APP_ID = "workbench"
 DEFAULT_APP_NAME = "本机工作台"
 DEFAULT_PROFILE = "file_workbench"
+
+
+def is_public_lite_build() -> bool:
+    bundle = getattr(sys, "_MEIPASS", None)
+    return bool(getattr(sys, "frozen", False) and bundle and (Path(bundle) / "public-lite.txt").is_file())
 
 
 def default_dictionary_path(data_dir: Path) -> Path:
@@ -46,7 +53,7 @@ def ensure_default_workbench_app(config_path: Path, data_dir: Path) -> bool:
     if not isinstance(entry, dict):
         apps[DEFAULT_APP_ID] = {
             "name": DEFAULT_APP_NAME,
-            "profile": DEFAULT_PROFILE,
+            "profile": RULES_WORKBENCH if is_public_lite_build() else DEFAULT_PROFILE,
             "dictionary": str(dictionary),
         }
         changed = True

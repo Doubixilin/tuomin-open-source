@@ -1,6 +1,7 @@
-"""PDF native-text extraction into Document IR (PyMuPDF, no OCR)."""
+"""PDF native-text extraction with PyMuPDF or pdfminer.six."""
 from __future__ import annotations
 
+from contextlib import closing
 import statistics
 import unicodedata
 from pathlib import Path
@@ -14,15 +15,15 @@ class PDFDependencyUnavailable(RuntimeError):
     """The optional PDF parser is not installed in this environment."""
 
 
-class _PyMuPDFPageAdapter:
-    """Small pdfplumber-compatible view over PyMuPDF character records."""
+class _TextPage:
+    """Character coordinates shared by both PDF parsers and the reading-order pass."""
 
     def __init__(self, chars: Iterable[dict[str, Any]], width: float) -> None:
         self.chars = list(chars)
         self.width = float(width)
 
     @classmethod
-    def from_page(cls, page: Any) -> "_PyMuPDFPageAdapter":
+    def from_page(cls, page: Any) -> "_TextPage":
         raw = page.get_text("rawdict")
         chars: list[dict[str, Any]] = []
         for block in raw.get("blocks", ()):
@@ -69,10 +70,47 @@ class _PyMuPDFPageAdapter:
 
     def filter(
         self, predicate: Callable[[dict[str, Any]], bool]
-    ) -> "_PyMuPDFPageAdapter":
-        return _PyMuPDFPageAdapter(
+    ) -> "_TextPage":
+        return _TextPage(
             (char for char in self.chars if predicate(char)), self.width
         )
+
+
+def _pdf_pages(path):
+    try:
+        import pymupdf
+    except ImportError:
+        try:
+            from pdfminer.high_level import extract_pages
+            from pdfminer.layout import LTChar, LTContainer, LTImage
+        except ImportError as exc:
+            raise PDFDependencyUnavailable(
+                "Install tuomin-gateway[pdf-text] for PDF text extraction, "
+                "or review THIRD_PARTY_NOTICES.md before installing tuomin-gateway[pdf]."
+            ) from exc
+        for page in extract_pages(path):
+            chars = []
+            has_images = False
+            pending = list(reversed(list(page)))
+            while pending:
+                item = pending.pop()
+                if isinstance(item, LTChar):
+                    text = item.get_text()
+                    if text.startswith("(cid:") and text.endswith(")"):
+                        text = "\ufffd"
+                    chars.append({"text": text, "x0": item.x0, "x1": item.x1,
+                                  "top": page.y1 - item.y1, "bottom": page.y1 - item.y0,
+                                  "object_type": "char"})
+                elif isinstance(item, LTImage):
+                    has_images = True
+                elif isinstance(item, LTContainer):
+                    pending.extend(reversed(list(item)))
+            yield _TextPage(chars, page.width), has_images, "pdfminer-native"
+        return
+
+    with pymupdf.open(stream=Path(path).read_bytes(), filetype="pdf") as document:
+        for page in document:
+            yield _TextPage.from_page(page), bool(page.get_images()), "pymupdf-native"
 
 
 def extract_pdf(
@@ -80,97 +118,84 @@ def extract_pdf(
     source_id: str,
     source_uid: str,
 ) -> tuple[list[DocumentBlock], list[dict[str, Any]], dict[str, Any]]:
-    try:
-        import pymupdf
-    except ImportError as exc:
-        raise PDFDependencyUnavailable(
-            "PDF support is not installed. Review THIRD_PARTY_NOTICES.md "
-            "before installing tuomin-gateway[pdf]."
-        ) from exc
-
     blocks: list[DocumentBlock] = []
     warnings: list[dict[str, Any]] = []
     two_column_pages = 0
     ocr_pages = 0
+    page_count = 0
     try:
-        pdf_bytes = Path(path).read_bytes()
-        document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-    except Exception as exc:  # pymupdf raises its own FzError/FileDataError
-        # hierarchy (not ValueError); translate at the parser boundary.
-        raise ValueError(f"invalid or unreadable PDF: {exc}") from exc
-    try:
-        page_count = int(document.page_count)
-        for page_index in range(page_count):
-            page_number = page_index + 1
-            page = document.load_page(page_index)
-            adapter = _PyMuPDFPageAdapter.from_page(page)
-            non_space_chars = sum(
-                1
-                for char in adapter.chars
-                if str(char.get("text") or "").strip()
-            )
-            needs_ocr = non_space_chars < 10 and bool(page.get_images())
-            if needs_ocr:
-                ocr_pages += 1
-                warnings.append(
-                    {
-                        "code": "PDF_PAGE_NEEDS_OCR",
-                        "severity": "warning",
-                        "message": f"PDF page {page_number} appears to require OCR",
-                        "source_id": source_id,
-                        "page": page_number,
-                        "requires_manual_review": True,
-                        "capability": "ocr",
-                        "capability_blocking": False,
-                        "details": {"page": page_number},
-                    }
+        with closing(_pdf_pages(path)) as pages:
+            for page_number, (adapter, has_images, method) in enumerate(pages, start=1):
+                page_count = page_number
+                non_space_chars = sum(
+                    1
+                    for char in adapter.chars
+                    if str(char.get("text") or "").strip()
                 )
-
-            lines, split = pdf_page_lines_in_reading_order(adapter)
-            if split is not None:
-                two_column_pages += 1
-                warnings.append(
-                    {
-                        "code": "PDF_TWO_COLUMN_REORDERED",
-                        "severity": "info",
-                        "message": (
-                            f"PDF page {page_number} was reordered left column first"
-                        ),
-                        "source_id": source_id,
-                        "page": page_number,
-                        "requires_manual_review": False,
-                        "capability_blocking": False,
-                        "details": {"page": page_number, "column_split": split},
-                    }
-                )
-
-            page_line_number = 0
-            for raw_line in lines:
-                text = str(raw_line).strip()
-                if not text:
-                    continue
-                page_line_number += 1
-                blocks.append(
-                    DocumentBlock(
-                        source_id=source_id,
-                        source_uid=source_uid,
-                        block_id=(
-                            f"page-{page_number:03d}-line-{page_line_number:04d}"
-                        ),
-                        order=len(blocks) + 1,
-                        block_type="line",
-                        text=text,
-                        extraction_method="pymupdf-native",
-                        legacy_locators=[f"{source_id}#page{page_number:03d}"],
-                        metadata={"page": page_number},
-                        quality={
-                            "level": "high",
-                            "requires_manual_review": False,
-                        },
+                needs_ocr = non_space_chars < 10 and has_images
+                if needs_ocr:
+                    ocr_pages += 1
+                    warnings.append(
+                        {
+                            "code": "PDF_PAGE_NEEDS_OCR",
+                            "severity": "warning",
+                            "message": f"PDF page {page_number} appears to require OCR",
+                            "source_id": source_id,
+                            "page": page_number,
+                            "requires_manual_review": True,
+                            "capability": "ocr",
+                            "capability_blocking": False,
+                            "details": {"page": page_number},
+                        }
                     )
-                )
-    finally:
-        document.close()
+
+                lines, split = pdf_page_lines_in_reading_order(adapter)
+                if split is not None:
+                    two_column_pages += 1
+                    warnings.append(
+                        {
+                            "code": "PDF_TWO_COLUMN_REORDERED",
+                            "severity": "info",
+                            "message": (
+                                f"PDF page {page_number} was reordered left column first"
+                            ),
+                            "source_id": source_id,
+                            "page": page_number,
+                            "requires_manual_review": False,
+                            "capability_blocking": False,
+                            "details": {"page": page_number, "column_split": split},
+                        }
+                    )
+
+                page_line_number = 0
+                for raw_line in lines:
+                    text = str(raw_line).strip()
+                    if not text:
+                        continue
+                    page_line_number += 1
+                    blocks.append(
+                        DocumentBlock(
+                            source_id=source_id,
+                            source_uid=source_uid,
+                            block_id=(
+                                f"page-{page_number:03d}-line-{page_line_number:04d}"
+                            ),
+                            order=len(blocks) + 1,
+                            block_type="line",
+                            text=text,
+                            extraction_method=method,
+                            legacy_locators=[f"{source_id}#page{page_number:03d}"],
+                            metadata={"page": page_number},
+                            quality={
+                                "level": "high",
+                                "requires_manual_review": False,
+                            },
+                        )
+                    )
+    except PDFDependencyUnavailable:
+        raise
+    except Exception as exc:
+        raise ValueError("invalid or unreadable PDF") from exc
 
     if not blocks or (page_count > 0 and ocr_pages == page_count):
         warnings.append(

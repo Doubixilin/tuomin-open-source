@@ -9,7 +9,8 @@ param(
     [switch]$SkipInstall,
     [switch]$SkipNativeBuild,
     [switch]$AllowModelDownload,
-    [switch]$Lite
+    [switch]$Lite,
+    [switch]$PublicBuild = ($env:TUOMIN_PUBLIC_BUILD -eq "1")
 )
 
 Set-StrictMode -Version Latest
@@ -70,6 +71,7 @@ try {
     $env:HF_HUB_OFFLINE = "1"
     $env:TRANSFORMERS_OFFLINE = "1"
     $env:TUOMIN_LITE = if ($Lite) { "1" } else { "0" }
+    $env:TUOMIN_PUBLIC_BUILD = if ($PublicBuild) { "1" } else { "0" }
     $env:TUOMIN_BUNDLE_MODEL_DIR = Join-Path $RootDir "packaging\ner-model"
     $BundleName = if ($Lite) { "Tuomin-Lite" } else { "Tuomin" }
 
@@ -84,44 +86,54 @@ try {
 
     if (-not $SkipInstall) {
         Invoke-Checked $PackagingPython @("-m", "ensurepip", "--upgrade")
-        Invoke-Checked $PackagingPython @(
-            "-m", "pip", "install", "--requirement", "requirements-windows.lock"
-        )
-        Invoke-Checked $PackagingPython @(
-            "-m", "pip", "install", "pyinstaller==6.22.2", "nuitka==4.1.3"
-        )
+        if ($PublicBuild) {
+            $Extras = if ($Lite) { "serve,document,shell,pdf-text" } else { "serve,document,shell,pdf-text,ner" }
+            Invoke-Checked $PackagingPython @(
+                "-m", "pip", "install", "--constraint", "requirements-windows.lock", ".[$Extras]", "pyinstaller==6.22.2"
+            )
+        } else {
+            Invoke-Checked $PackagingPython @(
+                "-m", "pip", "install", "--requirement", "requirements-windows.lock", "pyinstaller==6.22.2", "nuitka==4.1.3"
+            )
+        }
     }
     Invoke-Checked $PackagingPython @("-m", "pip", "check")
 
-    $ToolVersions = & $PackagingPython -c "from importlib.metadata import version; print(version('pyinstaller')); print(version('nuitka'))"
+    $ToolVersions = & $PackagingPython -c "from importlib.metadata import version; import os; print(version('pyinstaller')); print('unused' if os.environ['TUOMIN_PUBLIC_BUILD'] == '1' else version('nuitka'))"
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller or Nuitka is unavailable in packaging environment"
     }
     $ToolVersionLines = @($ToolVersions)
-    if ($ToolVersionLines[0].Trim() -ne "6.22.2" -or $ToolVersionLines[1].Trim() -ne "4.1.3") {
+    if ($ToolVersionLines[0].Trim() -ne "6.22.2" -or (-not $PublicBuild -and $ToolVersionLines[1].Trim() -ne "4.1.3")) {
         throw "Packaging tool version mismatch: $($ToolVersionLines -join ', ')"
     }
 
-    if (-not $Lite) {
+    if (-not $Lite -and -not $PublicBuild) {
         $ModelArguments = @("scripts/prepare_ner_model.py")
         if ($AllowModelDownload) {
             $ModelArguments += "--allow-download"
         }
         Invoke-Checked $PackagingPython $ModelArguments
     }
-    Invoke-Checked $PackagingPython @(
-        "scripts/write_delivery_metadata.py",
-        "--output", "packaging/delivery.json",
-        "--customer", $Customer
-    )
+    if ($PublicBuild) {
+        $Customer = "community"
+    } else {
+        Invoke-Checked $PackagingPython @(
+            "scripts/write_delivery_metadata.py",
+            "--output", "packaging/delivery.json",
+            "--customer", $Customer
+        )
+    }
 
     Remove-GeneratedPath (Join-Path $BuildOutputPath $BundleName)
     Remove-GeneratedPath (Join-Path $BuildWorkPath "tuomin_gateway")
 
-    if (-not $SkipNativeBuild) {
-        Invoke-Checked $PackagingPython @("scripts/build_native_modules.py")
+    if (-not $PublicBuild) {
+        if (-not $SkipNativeBuild) {
+            Invoke-Checked $PackagingPython @("scripts/build_native_modules.py")
+        }
+        Invoke-Checked $PackagingPython @("scripts/build_native_modules.py", "--check")
     }
-    Invoke-Checked $PackagingPython @("scripts/build_native_modules.py", "--check")
     Invoke-Checked $PackagingPython @(
         "-m", "PyInstaller", "--clean", "--noconfirm",
         "--distpath", $BuildOutputPath, "--workpath", $BuildWorkPath,
@@ -129,6 +141,9 @@ try {
     )
 
     $BundlePath = Join-Path $BuildOutputPath $BundleName
+    if ($PublicBuild) {
+        Copy-Item -LiteralPath (Join-Path $RootDir "packaging/windows-public") -Destination (Join-Path $BundlePath "Windows-Notices") -Recurse
+    }
     Invoke-Checked $PackagingPython @(
         "scripts/build_manual.py", (Join-Path $BundlePath "Tuomin-Windows使用手册.html"), "--windows"
     )
@@ -159,6 +174,10 @@ try {
     }
     $VariantSuffix = if ($Lite) { "-lite" } else { "" }
     $ReleaseBase = "Tuomin-windows-x64$VariantSuffix-$ProjectVersion-$CustomerSlug"
+    if ($PublicBuild) {
+        $PublicVariant = if ($Lite) { "Lite" } else { "Runtime" }
+        $ReleaseBase = "Tuomin-$ProjectVersion-Windows-x64-$PublicVariant"
+    }
     $ArchivePath = Join-Path $ReleasePath "$ReleaseBase.zip"
     $ManifestPath = Join-Path $ReleasePath "$ReleaseBase.manifest.json"
     $ChecksumPath = Join-Path $ReleasePath "$ReleaseBase.sha256"

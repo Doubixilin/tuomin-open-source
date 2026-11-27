@@ -1,5 +1,11 @@
 # 版本记录
 
+## 0.2.0 · 双平台桌面 Lite
+
+- 发布 macOS Apple Silicon、Windows x64 两个可直接运行的桌面构建。Lite 使用规则和已配置的词典，支持剪贴板、文档工作台和文字型 PDF。
+- 提供 Word、Excel、PowerPoint 合成原件、实际脱敏件、回填件和演示课件。[下载演示材料](demo/office-showcase/README.md)
+- 增加工作台截图、剪贴板写回操作说明、数据流与设计取舍。[图文指南](docs/DESKTOP_GUIDE.md) · [架构](docs/ARCHITECTURE.md) · [设计](docs/DESIGN.md)
+
 ## 双平台源码发布 · 2026-11-27
 
 - 增加 macOS 和 Windows 桌面工作台源码、原生交互、Office 文件处理、构建工具和双平台测试。

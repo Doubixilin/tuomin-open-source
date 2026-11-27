@@ -193,7 +193,7 @@ def test_unsupported_extension_and_oversize_body(tmp_path, monkeypatch):
         content=b"not a pdf",
     )
     import importlib.util
-    expected = 422 if importlib.util.find_spec("pymupdf") is not None else 415
+    expected = 422 if any(importlib.util.find_spec(pkg) is not None for pkg in ("pymupdf", "pdfminer")) else 415
     assert garbage_pdf.status_code == expected
 
     monkeypatch.setenv("TUOMIN_WORKBENCH_MAX_BYTES", "3")
@@ -210,7 +210,7 @@ def test_pdf_without_optional_dependency_is_explicitly_unavailable(tmp_path, mon
     original_import = builtins.__import__
 
     def without_pdf(name, *args, **kwargs):
-        if name == "pymupdf":
+        if name == "pymupdf" or name.startswith("pdfminer"):
             raise ImportError("synthetic missing optional dependency")
         return original_import(name, *args, **kwargs)
 

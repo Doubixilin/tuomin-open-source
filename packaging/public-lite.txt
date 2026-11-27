@@ -1,0 +1,1 @@
+Tuomin Lite uses rules and locally configured dictionaries. No NER model or model runtime is bundled.

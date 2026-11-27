@@ -38,6 +38,7 @@
 </aside>
 
 <main>
+<div id="liteNotice" class="meta" hidden></div>
 <div id="demoBanner" class="demo-banner" hidden>演示模式 · 合成数据 · 独立临时存储 · 退出即清除 · <a href="/demo/samples/synthetic-contract.docx" download>合成合同 DOCX</a> · <a href="/demo/samples/synthetic-register.xlsx" download>合成台账 XLSX</a></div>
 
   <!-- ===== 开始 ===== -->
@@ -1168,6 +1169,7 @@ async function runRedact() {
   if ($("#t_ner").checked) body.use_ner = true;
   if (SAMPLE_APP && !$("#t_profile").value) body.app_id = SAMPLE_APP;
   else if ($("#t_profile").value) body.profile = $("#t_profile").value;
+  else if (globalThis.__tuominRulesWorkbench) body.app_id = "workbench";
   const btn = $("#t_run"); btn.disabled = true; btn.textContent = "脱敏中…";
   $("#t_before").textContent = "";
   $("#t_after").textContent = "正在脱敏，请稍候…";
@@ -1550,6 +1552,7 @@ async function loadTaskOptions(preferred) {
     const values = [...TASKS.list.map((j) => j.task_id), ...agents.map((a) => "agent:" + a.namespace_id)];
     const has = (v) => values.includes(v);
     sel.value = has(previous) ? previous : (has(TASKS.preferred) ? TASKS.preferred : (values[0] || ""));
+    if (id === "#an_task" && sel.value !== previous) clearAnswerResult();
   }
 }
 function agentSessionLabel(a) {
@@ -1623,14 +1626,36 @@ $("#r_dl").onclick = () => download(RF.base + ".restored.md", RF.restored, "text
 $("#r_dl_office").onclick = () => { if (RF.office) downloadB64(RF.office.name, RF.office.b64, RF.office.mime); };
 
 // --- answer refill tab ---
-const AN = { pkg: null, restored: "" };
+const AN = { revision: 0, textImport: 0, restored: null };
+function clearAnswerResult() {
+  AN.revision++;
+  AN.restored = null;
+  $("#an_out").textContent = "";
+  $("#an_diff").textContent = "";
+  $("#an_dl").disabled = true;
+  $("#an_confirm_row").style.display = "none";
+  $("#an_confirm").checked = false;
+  return AN.revision;
+}
+$("#an_text").oninput = () => { AN.textImport++; clearAnswerResult(); };
+$("#an_pass").oninput = clearAnswerResult;
+$("#an_task").onchange = clearAnswerResult;
+$("#an_pkg").onchange = clearAnswerResult;
 $("#an_file").onchange = async () => {
-  const f = $("#an_file").files[0];
-  if (f) $("#an_text").value = await f.text();
-};
-$("#an_pkg").onchange = async () => {
-  const f = $("#an_pkg").files[0]; AN.pkg = null;
-  if (f) { try { AN.pkg = JSON.parse(await f.text()); } catch { toast("恢复包不是有效 JSON"); } }
+  const ticket = ++AN.textImport;
+  clearAnswerResult();
+  const file = $("#an_file").files[0];
+  if (!file) return;
+  $("#an_text").value = "";
+  try {
+    const text = await file.text();
+    if (ticket === AN.textImport) {
+      $("#an_text").value = text;
+      clearAnswerResult();
+    }
+  } catch {
+    if (ticket === AN.textImport) toast("无法读取回答文件");
+  }
 };
 function renderAnswerSummary(s) {
   if (!s) return "";
@@ -1639,18 +1664,33 @@ function renderAnswerSummary(s) {
   return `<div class="kv" style="margin-top:12px"><span class="k">恢复条数 <b>${s.restored_count}</b></span>${chips}${unused}</div>`;
 }
 async function doAnswerRefill(confirmEmpty) {
+  const revision = clearAnswerResult();
   const text = $("#an_text").value;
   if (!text.trim()) return toast("请粘贴或导入 AI 回答");
-  const task = AN.pkg ? "" : selectedTask("#an_task");
-  if (!AN.pkg && !task) return toast("请选择对应的任务，或改用恢复包");
-  const pass = $("#an_pass").value;
-  if (AN.pkg && !pass) return toast("请输入恢复包口令");
-  const r = await fetch(AN.pkg ? "/api/v1/documents/refill-answer" : taskRoute(task, "/refill-answer"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
-    body: JSON.stringify(AN.pkg ? { answer_markdown: text, package: AN.pkg, passphrase: pass, confirm_empty: confirmEmpty } : { answer_markdown: text, confirm_empty: confirmEmpty }),
-  });
-  const data = await r.json().catch(() => ({}));
+  const packageFile = $("#an_pkg").files[0];
+  const task = packageFile ? "" : selectedTask("#an_task");
+  if (!packageFile && !task) return toast("请选择对应的任务，或改用恢复包");
+  const body = { answer_markdown: text, confirm_empty: confirmEmpty };
+  if (packageFile) {
+    body.passphrase = $("#an_pass").value;
+    if (!body.passphrase) return toast("请输入恢复包口令");
+    try { body.package = JSON.parse(await packageFile.text()); }
+    catch { if (revision === AN.revision) toast("恢复包不是有效 JSON"); return; }
+    if (revision !== AN.revision) return;
+  }
+  let r, data;
+  try {
+    r = await fetch(packageFile ? "/api/v1/documents/refill-answer" : taskRoute(task, "/refill-answer"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-tuomin-admin-token": getToken(), "X-Requested-With": "tuomin-ui" },
+      body: JSON.stringify(body),
+    });
+    data = await r.json().catch(() => ({}));
+  } catch (error) {
+    if (revision === AN.revision) throw error;
+    return;
+  }
+  if (revision !== AN.revision) return;
   if (r.status === 401) throw new Error("管理 Token 无效或未设置，请到「设置」页填写。");
   if (data.status === "needs_confirmation") {
     $("#an_diff").innerHTML = `<div class="blocked-note" style="background:var(--warn-soft);color:var(--warn);border-color:#f3dcae">⚠ 回答中没有命中任何占位符：可能选错了任务，或 AI 确实没有引用。请确认后再继续。</div>` + renderAnswerSummary(data.summary);
@@ -1663,6 +1703,7 @@ async function doAnswerRefill(confirmEmpty) {
     $("#an_diff").innerHTML = `<div class="blocked-note">⛔ 回填被阻断：${esc(msg)}</div>` + renderDiffLists(data.diff || {});
     return;
   }
+  if (typeof data.restored_markdown !== "string") throw new Error("未收到本次回填结果");
   AN.restored = data.restored_markdown;
   $("#an_out").textContent = AN.restored;
   $("#an_diff").innerHTML = renderAnswerSummary(data.summary);
@@ -1674,7 +1715,9 @@ $("#an_confirm_btn").onclick = () => {
   if (!$("#an_confirm").checked) return toast("请先勾选确认");
   doAnswerRefill(true).catch((e) => toast("失败：" + e.message));
 };
-$("#an_dl").onclick = () => download("answer.restored.md", AN.restored, "text/markdown");
+$("#an_dl").onclick = () => {
+  if (AN.restored !== null) download("answer.restored.md", AN.restored, "text/markdown");
+};
 
 // --- trusted preview tab ---
 const PV = { pkg: null, restored: "", lockTimer: null, lockEpoch: 0 };

@@ -166,7 +166,15 @@ function initTuominShellUI() {
   function applyShellMode() {
     const native = !!window.__tuominShell, demo = !!window.__tuominDemo;
     $('#adminTokenBar').hidden = native;
-    $('#modeBadge').textContent = demo ? '演示模式' : '正式模式';
+    $('#modeBadge').textContent = demo ? '演示模式' : window.__tuominPublicLite ? 'Lite · 无 NER 模型' : '正式模式';
+    if (window.__tuominPublicLite) {
+      $('#t_ner').checked = false;
+      $('#t_ner').disabled = true;
+      $('#liteNotice').hidden = false;
+      $('#liteNotice').textContent = window.__tuominRulesWorkbench
+        ? '本机工作台使用规则与本机词典。未列入词典的人名、组织可能漏检，请核对后再外发。'
+        : 'Lite 未包含 NER 模型。需要 NER 的既有或严格配置将报告检测器未就绪。';
+    }
     $('#demoBanner').hidden = !demo;
     document.body.classList.toggle('tuomin-demo', demo);
     $('#dictReadonly').hidden = !demo;
@@ -312,7 +320,10 @@ function initTuominShellUI() {
   refreshNative();
   // External browsers and --headless have no native bootstrap.
   if (typeof fetch === 'function') fetch('/api/v1/runtime-mode').then(r => r.json()).then(mode => {
-    if (mode.demo) { window.__tuominDemo = true; applyShellMode(); }
+    if (mode.demo) window.__tuominDemo = true;
+    window.__tuominPublicLite = !!mode.public_lite;
+    window.__tuominRulesWorkbench = !!mode.rules_workbench;
+    if (mode.demo || mode.public_lite) applyShellMode();
   }).catch(() => {});
 }
 

@@ -14,8 +14,8 @@ jobs:
         include:
           - {os: ubuntu-latest, python: '3.10', extras: dev}
           - {os: ubuntu-latest, python: '3.12', extras: dev}
-          - {os: macos-latest, python: '3.12', extras: 'dev,shell,pdf'}
-          - {os: windows-latest, python: '3.12', extras: 'dev,shell,pdf'}
+          - {os: macos-latest, python: '3.12', extras: 'dev,shell,pdf,pdf-text'}
+          - {os: windows-latest, python: '3.12', extras: 'dev,shell,pdf,pdf-text'}
     env:
       HF_HUB_OFFLINE: '1'
       TRANSFORMERS_OFFLINE: '1'

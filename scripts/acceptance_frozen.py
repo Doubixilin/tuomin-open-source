@@ -141,9 +141,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", nargs="?", type=Path)
     parser.add_argument("--lite", action="store_true", help="验证不含 NER 的 Lite 产物")
+    parser.add_argument("--public-lite", action="store_true", help="验证公开 Lite 规则与词典正式业务矩阵")
     parser.add_argument("--skip-desktop", action="store_true", help="仅验证无界面服务与业务，明确跳过原生窗口/托盘")
     args = parser.parse_args()
-    LITE = args.lite or os.environ.get("TUOMIN_ACCEPTANCE_LITE") == "1"
+    LITE = args.public_lite or args.lite or os.environ.get("TUOMIN_ACCEPTANCE_LITE") == "1"
     default_binary = (ROOT / "dist" / "Tuomin-Lite" / "Tuomin.exe" if os.name == "nt" else ROOT / "dist" / "lite" / "tuomin-workbench-lite" / "tuomin-workbench") if LITE else BINARY
     BINARY = (args.binary or default_binary).resolve()
     if not BINARY.exists():
@@ -163,7 +164,7 @@ def main() -> int:
     registry = data_dir / "apps.json"
     registry.write_text(json.dumps({"apps": {
         "accept": {
-            "profile": "kb",
+            "profile": "file_workbench_rules" if args.public_lite else "kb",
             "dictionary": str(dictionary),
             "capabilities": ["detect", "redact", "namespace"],
             "capability_tokens": {k: "sha256:" + hashlib.sha256(CAPABILITY.encode()).hexdigest() for k in ("detect", "redact", "namespace")},
@@ -199,12 +200,18 @@ def main() -> int:
         "HOME": str(home), "USERPROFILE": str(home),
         "APPDATA": str(home / 'AppData' / 'Roaming'), "LOCALAPPDATA": str(home / 'AppData' / 'Local'),
     }
+    # Security.framework resolves the default login keychain from HOME.
+    # Only the formal service needs it; desktop/client probes keep the synthetic
+    # home. The service writes a unique temporary keychain item deleted below.
+    formal_env = dict(env)
+    if sys.platform == "darwin":
+        formal_env["HOME"] = str(Path.home())
     print(f"[1/9] 启动冻结产物: {BINARY}")
     # 每轮使用独立测试条目；不得删除或读取日常使用的映射加密密钥。
     print(f"  隔离验收目录: {work}")
     log_handle = (work / "service.log").open("w", encoding="utf-8")
     proc = subprocess.Popen(
-        [str(BINARY), "--headless", "--shutdown-on-stdin-close"], env=env,
+        [str(BINARY), "--headless", "--shutdown-on-stdin-close"], env=formal_env,
         stdin=subprocess.PIPE,
         stdout=log_handle, stderr=subprocess.STDOUT, text=True,
         encoding="utf-8", errors="replace",
@@ -266,6 +273,9 @@ def main() -> int:
         # These checks must run even when no formal acceptance license exists.
         code, readiness = get_json(url + "/readiness")
         ner = readiness.get("detectors", {}).get("ner", {})
+        if args.public_lite:
+            mode_code, mode = get_json(url + "/api/v1/runtime-mode")
+            check("公开 Lite 构建标记生效", mode_code == 200 and mode.get("public_lite") is True and mode.get("demo") is False)
         if LITE:
             check("Lite 明确不包含 NER 运行库", ner.get("installed") is False and ner.get("active") is False)
             check("Lite 严格档缺 NER 时未就绪", code == 503 and readiness.get("status") == "not_ready")
@@ -276,14 +286,14 @@ def main() -> int:
         check("/ui/ 200 且含脱敏入口", code == 200 and "文件脱敏" in ui, str(code))
         from acceptance_shell import run_shell_checks
         run_shell_checks(BINARY, env=env, formal_data_dir=data_dir, formal_origin=url,
-                         work=work, check=check, lite=LITE, desktop=not args.skip_desktop, skip=skip)
-        if LITE:
+                         work=work, check=check, lite=LITE and not args.public_lite, desktop=not args.skip_desktop, skip=skip)
+        if LITE and not args.public_lite:
             skip("Lite DOCX/XLSX 成功往返", "缺 NER 时验证导出阻断；未运行成功导出矩阵")
 
         # 开源版不要求授权：冻结包打开即用，业务矩阵直接运行（Lite 缺 NER 除外）。
         code, status = get_json(url + "/api/v1/license/status")
         check("冻结包不强制离线授权", code == 200 and status.get("enforcement") == "disabled", f"http={code}")
-        if LITE:
+        if LITE and not args.public_lite:
             skip("正式业务矩阵", "Lite 产物不运行 Full 业务矩阵")
             raise _SkipFormalMatrix()
 
@@ -395,7 +405,7 @@ def main() -> int:
         # 重启服务，验证历史数据恢复与 Token 复用不依赖进程内状态。
         from acceptance_shell import _stop
         check("重启前服务正常退出", _stop(proc) and proc.returncode == 0)
-        proc = subprocess.Popen([str(BINARY), "--headless", "--shutdown-on-stdin-close"], env=env,
+        proc = subprocess.Popen([str(BINARY), "--headless", "--shutdown-on-stdin-close"], env=formal_env,
                                 stdin=subprocess.PIPE, stdout=log_handle, stderr=subprocess.STDOUT,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         deadline = time.time() + 120

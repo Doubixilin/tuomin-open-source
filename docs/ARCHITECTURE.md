@@ -127,3 +127,47 @@ flowchart TB
 桌面构建流程见 `packaging/` 与 `scripts/`。源码发布包含本地模型接入，权重由运行者另行准备。
 
 测试入口位于仓库根目录 `tests/`，包括 `test_proxy.py`、`test_documents_api.py`、`test_public_example.py` 等。模拟检测器或上游的回归验证接口和处理逻辑；真实 NER 效果、客户端兼容性与供应商联调需另行验证。
+
+## 桌面工作台怎样调用网关
+
+桌面包把窗口、系统适配器和本地 HTTP 服务装在一起。浏览器和原生窗口共用控制台页面。文件选择、系统剪贴板、全局快捷键和托盘通知由桌面层提供。启动器采用单实例锁，记录实际服务地址；端口冲突时客户端可通过发现文件找到当前实例。
+
+```mermaid
+flowchart TD
+    Start["启动器与实例发现"] --> API["仅监听回环地址的 FastAPI 服务"]
+    Start --> OS{"当前桌面平台"}
+    OS --> Mac["macOS · Cocoa/WebKit、菜单栏、系统剪贴板"]
+    OS --> Win["Windows · WebView2、托盘、系统剪贴板"]
+    Mac --> Bridge["ShellBridge 与显式操作"]
+    Win --> Bridge
+    Bridge --> Clip["ClipboardController · 记录会话句柄"]
+    Clip -->|"受限能力凭据"| API
+    UI["共享 HTML 工作台"] -->|"本机管理请求"| API
+    API --> Core["检测、策略、占位符、工作记录"]
+    Core --> Protected["平台保护的映射存储"]
+    Core --> Result["预览、可导出的副本或回填结果"]
+```
+
+| 层 | 要看的实现 | 负责的决定 |
+| --- | --- | --- |
+| 进程与窗口 | [启动器](../packaging/launcher.py) · [桌面壳](../src/tuomin_gateway/shell/app.py) | 绑定回环端口、选择当前平台后端。无窗口模式也能提供 Web 控制台。 |
+| 用户动作 | [桌面桥接](../src/tuomin_gateway/shell/bridge.py) · [剪贴板控制器](../src/tuomin_gateway/shell/clipboard.py) | 区分普通复制回填与就地替换。普通动作写回前再次读取剪贴板，内容已变化就取消。 |
+| 本机服务 | [应用启动与授权检查](../src/tuomin_gateway/service/app.py) · [v1 能力接口](../src/tuomin_gateway/service/v1.py) | 管理路由检查令牌与 Host；带应用身份的业务路由检查 capability、作用域与回填合约。 |
+| 文档进出 | [文件接口](../src/tuomin_gateway/service/v1_documents.py) · [Word](../src/tuomin_gateway/document/docx_patch.py) · [Excel 与 PowerPoint](../src/tuomin_gateway/document/office_patch.py) | 抽取可处理的文本并保留位置，按格式生成新的脱敏或回填文件；检查不可安全处理的部件。 |
+| 平台环境 | [映射存储](../src/tuomin_gateway/store.py) · [平台权限](../src/tuomin_gateway/platform_security.py) · [Windows ACL](../src/tuomin_gateway/windows_acl.py) | Windows 使用当前用户 DPAPI，macOS 使用钥匙串持有密钥进行 AES-GCM 加密。单独运行的演示采用临时测试存储。 |
+
+### Lite 的检测与文档路径
+
+公开桌面发行包使用具名档位 `file_workbench_rules`。绑定该档位的文件任务运行规则和已配置的词典。应用若声明必需 NER，仍需加载模型并满足就绪条件。文件输出还要检查应用绑定、检测器状态、出站扫描等条件；词典命中数量不能替代出站判断。Lite 使用 pdfminer.six 抽取 PDF 的原生文字层；纯图像页面没有可供该路径识别的文字。Word、Excel、PowerPoint 的原格式副本走各自的结构化文本处理路径。[策略定义](../src/tuomin_gateway/profiles.py) · [文件接口](../src/tuomin_gateway/service/v1_documents.py) · [PDF 读取器](../src/tuomin_gateway/document/pdf.py)
+
+### 哪些状态会留下
+
+| 数据 | 产生和保管 | 生命周期 |
+| --- | --- | --- |
+| 文本预览 | `/redact_snippet` 在内存中生成对照 | 预览接口不会生成可供以后回填的句柄。 |
+| 文件任务 | SQLite 记录任务号、文件名、状态与计数；原值映射在独立的受保护存储中 | 回填时需要原任务的映射或有效恢复包。任务记录、导出的文件、映射分别有自己的生命周期。 |
+| 映射 | 句柄绑定应用；剪贴板、跨段文本可在命名空间内复用编号 | 底层存储按 TTL 读取/清理。归档命名空间后可在有效期内申请恢复，删除命名空间会回收关联句柄。 |
+| 剪贴板状态 | 当前会话文件只保存命名空间、时间、数量等元数据；控制器将成功输出写到平台剪贴板 | 新会话会归档旧会话。默认空闲 8 小时后，下次执行脱敏时切换会话。退出停止本地服务，需另用清除会话、清空剪贴板等操作处理留存数据。 |
+| 恢复包与本地导出 | 由用户显式保存。口令加密恢复包内含占位符与原值的关系 | 保管期限由持有人决定。服务端映射过期不会删除用户已经另存的恢复包、原格式副本或其他程序的剪贴板历史。 |
+
+映射、命名空间、工作记录的持久化可以分别追到 [MappingVault](../src/tuomin_gateway/vault.py)、[NamespaceVault](../src/tuomin_gateway/namespace_vault.py)、[任务数据库](../src/tuomin_gateway/jobs.py) 和 [本地会话文件](../src/tuomin_gateway/shell/storage.py)。功能层面的示例见[桌面操作图解](DESKTOP_GUIDE.md)。
