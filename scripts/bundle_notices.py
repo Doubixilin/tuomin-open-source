@@ -13,7 +13,9 @@ def bundle_notices(analysis, project_root, work_dir):
     output = Path(work_dir) / "third-party-notices"
     output.mkdir(parents=True, exist_ok=True)
     owners = metadata.packages_distributions()
-    names = {"pyinstaller", "pdfminer.six"}
+    # Public builds collect these explicitly, including certifi as replaceable
+    # source files outside the PYZ, so it may be absent from analysis.pure.
+    names = {"certifi", "pyinstaller", "pdfminer.six"}
     for module, _, _ in analysis.pure:
         names.update(owners.get(module.partition(".")[0], ()))
     # Binary-only extensions and frameworks can have different owners from the

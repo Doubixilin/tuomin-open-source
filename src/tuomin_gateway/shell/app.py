@@ -202,7 +202,7 @@ def _run_desktop(backend, webview, client, server, *, base_url, port, admin_toke
         from .bridge import ShellBridge
         from tuomin_gateway.service.limits import max_text_chars
         directory = Path(os.environ['TUOMIN_DATA_DIR'])
-        registration = ClipboardRegistration(LocalClient(base_url, timeout=120), admin_token, directory)
+        registration = ClipboardRegistration(LocalClient(base_url, timeout=120), admin_token, directory, demo=demo)
         controller = ClipboardController(pasteboard, LocalClient(base_url, timeout=120), registration.tokens, SessionFile(directory), lambda text,action=None: notify_clipboard_result(notifier, bridge, controller, text, action), max_chars=max_text_chars())
         bridge = ShellBridge(directory, registration, controller, demo=demo)
         try:

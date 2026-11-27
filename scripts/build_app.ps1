@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$PythonBin = "python",
     [string]$VenvDir = ".venv-packaging-win312",
     [string]$Customer = "community",

@@ -33,9 +33,9 @@ class ShellBridge:
         self._window = self._bar = self._hotkeys = self._login = None
         self._selection = self._keyboard = None
         self._sources = registration.sources()
-        if 'dictionary_source' not in saved and any(item['app_id'] == PREFERRED_SOURCE for item in self._sources):
-            # First run: follow the local dictionary the launcher provisions.
-            self._settings['dictionary_source'] = PREFERRED_SOURCE
+        preferred = 'demo_contract' if demo else PREFERRED_SOURCE
+        if 'dictionary_source' not in saved and any(item['app_id'] == preferred for item in self._sources):
+            self._settings['dictionary_source'] = preferred
         self._errors = {}
         self._lock = threading.RLock()
 

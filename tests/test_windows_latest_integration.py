@@ -134,7 +134,9 @@ def test_windows_desktop_startup_registers_new_actions_and_quits_without_cocoa(t
     events, bars = [], []
     class Registration:
         tokens = {'namespace': 'synthetic'}
-        def __init__(self, client, *args): self.client = client
+        def __init__(self, client, *args, demo):
+            assert demo is True
+            self.client = client
         def sources(self): return [{'app_id': '', 'label': '通用 PII'}]
         def configure(self, source): pass
     class Window:

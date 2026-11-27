@@ -46,6 +46,12 @@ python packaging/launcher.py --demo
 
 演示会在临时目录创建合成词典、应用配置与 Office 文件。正常运行使用 `python packaging/launcher.py`。需要原生窗口时，macOS 使用系统 WebKit，Windows 使用 WebView2。从源码处理 PDF 原生文本可安装 `.[pdf-text]`（pdfminer.six）。公开 Lite 桌面包包含这条文本解析路径。Lite 使用规则与选定词典，未登记的姓名或公司可能留下；启用本地 NER 的源码部署需另备权重。[外部资源说明](docs/EXTERNAL_RESOURCES.md)
 
+### 从源码构建相同功能的 Lite 版
+
+macOS 使用 Apple Silicon 与 Python 3.12，在干净检出中运行 `TUOMIN_PUBLIC_BUILD=1 bash scripts/build_app.sh`，应用位于 `dist/lite/Tuomin Lite.app`。构建所用解释器和依赖自身的最低系统版本也会影响最终要求。
+
+Windows x64 使用 Python 3.12.10，在仓库根目录的 PowerShell 中运行 `.\scripts\build_app.ps1 -PublicBuild -Lite`。构建脚本会冻结应用、生成 ZIP，重新解压并检查产物。两个平台的公开模式从源码打包规则、词典和文字型 PDF 后端，生成的包附带组件许可。[第三方组件说明](THIRD_PARTY_NOTICES.md)
+
 ## 作为本地 AI 网关使用
 
 支持自定义 API 地址的应用，可以将兼容请求先交给本机脱敏网关：本地规则、词典和 NER 共同检测，按应用策略替换敏感值，再转发到配置好的上游模型服务。原值映射留在本地；响应默认保留占位符，也可为受信任的本地应用显式启用自动回填。

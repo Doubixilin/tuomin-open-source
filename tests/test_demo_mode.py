@@ -303,3 +303,60 @@ def test_demo_blocks_external_client_apply_and_verify_without_host_file_access(t
                 app.state.job_store.close()
     assert os.environ["TUOMIN_WORKBUDDY_MODELS"] == str(models)
     assert _snapshot(host) == before
+
+
+def test_demo_clipboard_uses_isolated_dictionary_without_ner():
+    from fastapi.testclient import TestClient
+
+    from tuomin_gateway.profiles import RULES_WORKBENCH
+    from tuomin_gateway.service.app import create_app
+    from tuomin_gateway.shell.bridge import ShellBridge
+    from tuomin_gateway.shell.clipboard import ClipboardController
+    from tuomin_gateway.shell.registration import ClipboardRegistration
+    from tuomin_gateway.shell.storage import SessionFile, write_private
+
+    class Clipboard:
+        text = "虚构星橙工程有限公司由许星舟负责验收"
+
+        def read_text(self):
+            return self.text
+
+        def write_text(self, text, *, concealed):
+            self.text = text
+
+    with demo_environment() as demo:
+        configure_admin_token(demo.root)
+        token = os.environ["TUOMIN_ADMIN_TOKEN"]
+        app = create_app()
+        try:
+            with TestClient(app, base_url="http://127.0.0.1") as api:
+                class Gateway:
+                    def request(self, method, path, payload=None, *, token, admin=False):
+                        header = "x-tuomin-admin-token" if admin else "x-tuomin-capability-token"
+                        response = api.request(method, path, json=payload, headers={
+                            header: token, "X-Requested-With": "tuomin-shell"
+                        })
+                        return response.status_code, response.json()
+
+                gateway = Gateway()
+                board = Clipboard()
+                credentials = ClipboardRegistration(gateway, token, demo.root, demo=True)
+                controller = ClipboardController(board, gateway, credentials.tokens, SessionFile(demo.root), lambda *_: None)
+                bridge = ShellBridge(demo.root, credentials, controller, demo=True)
+                source = bridge.get_shell_settings()["dictionary_source"]
+                assert source == "demo_contract"
+                credentials.configure(source)
+                registry = json.loads((demo.root / "synthetic-apps.json").read_text(encoding="utf-8"))["apps"]
+                assert registry["clipboard"]["profile"] == RULES_WORKBENCH
+                assert registry["clipboard"]["dictionary"] == registry[source]["dictionary"]
+                original = board.text
+                assert controller.redact()
+                assert board.text == "<ORG_001>由<PERSON_001>负责验收"
+                assert controller.refill()
+                assert board.text == original
+
+                write_private(demo.root / "shell-settings.json", {"dictionary_source": "demo_general"})
+                saved = ShellBridge(demo.root, credentials, controller, demo=True)
+                assert saved.get_shell_settings()["dictionary_source"] == "demo_general"
+        finally:
+            app.state.job_store.close()

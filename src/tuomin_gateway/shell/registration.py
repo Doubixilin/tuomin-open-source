@@ -12,7 +12,8 @@ CAPABILITIES = ('detect', 'redact', 'namespace', 'trusted_refill')
 
 
 class ClipboardRegistration:
-    def __init__(self, client, admin_token, directory):
+    def __init__(self, client, admin_token, directory, *, demo=False):
+        self.demo = demo
         self.client, self.admin_token = client, admin_token
         self.path = Path(directory) / 'clipboard-tokens.json'
         self.tokens = read_private(self.path)
@@ -47,7 +48,7 @@ class ClipboardRegistration:
             if not original.get('dictionary'):
                 raise ValueError('selected dictionary unavailable')
             entry['dictionary'] = original['dictionary']
-        if is_public_lite_build():
+        if self.demo or is_public_lite_build():
             # Keep an existing stricter clipboard policy when refreshing credentials.
             apps = self._admin('GET', '/admin/apps').get('apps', [])
             existing = next((app for app in apps if app.get('app_id') == 'clipboard'), {})
